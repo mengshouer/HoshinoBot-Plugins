@@ -18,8 +18,6 @@ async def bili_keyword(bot, ev):
         elif '请使用最新版本手机QQ查看' in text and "哔哩哔哩" not in text:
             return
         msg = await extract(text)
-        if "时尚品鉴" in str(msg):
-            return None
         if not msg:
             pattern = re.compile(r'"desc":".*?"')
             desc = re.findall(pattern,text)
@@ -36,35 +34,7 @@ async def bili_keyword(bot, ev):
         msg = "Error: {}".format(type(e))
     await bot.send(ev, msg)
     await util.silence(ev, 1)
-'''
-@sv.on_command('[CQ:json,data=<?xml')
-async def bili_xml(session):
-    try:
-        text = str(ev.message).strip()
-        print("xml,text----" + text)
-        if "当前版本不支持该消息类型" in text and "哔哩哔哩" not in text:
-            return
-        elif '请使用最新版本手机QQ查看' in text and "哔哩哔哩" not in text:
-            return
-        msg = await extract(text)
-        if "时尚品鉴" in str(msg):
-            return None
-        if not msg:
-            pattern = re.compile(r'"desc":".*?"')
-            desc = re.findall(pattern,text)
-            i = 0
-            while i < len(desc):
-                title_dict = "{"+desc[i]+"}"
-                title = eval(title_dict)
-                url = await search_bili_by_title(title['desc'])
-                if url:
-                    msg = await extract(url)
-                    break
-                i += 1
-    except Exception as e:
-        msg = "Error: {}".format(type(e))
-    await session.send(msg)
-'''
+
 async def extract(text):
     try:
         aid = re.compile(r'(av|AV)\d+').search(text)
