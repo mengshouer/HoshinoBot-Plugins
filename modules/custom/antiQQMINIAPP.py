@@ -33,7 +33,6 @@ async def bili_keyword(bot, ev):
     except Exception as e:
         msg = "Error: {}".format(type(e))
     await bot.send(ev, msg)
-    await util.silence(ev, 1)
 
 async def extract(text):
     try:

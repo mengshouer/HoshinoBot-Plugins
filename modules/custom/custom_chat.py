@@ -10,7 +10,6 @@ sv = Service('custom_chat', visible=False)
 @sv.on_fullmatch('我好了')
 async def nihaole(bot, ev):
     await bot.send(ev, '不许好，憋回去！')
-    await util.silence(ev, 30)
 
 
 @sv.on_keyword(('有一说一', 'u1s1', 'yysy'))
