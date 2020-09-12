@@ -8,11 +8,24 @@ sv = Service('antiMINIAPP')
 bili_url = ['www.bilibili.com/video', 'b23.tv/', '当前版本不支持该消息类型',
             '请使用最新版本手机QQ查看', '哔哩哔哩']
 
+analysis_stat = {}   # group_id: (text, is_analysis)
 
 @sv.on_keyword(bili_url)
 async def bili_keyword(bot, ev):
+    group_id = ev.group_id
     try:
         text = str(ev.message).strip()
+        # 避免多个机器人时重复解析
+        if group_id not in analysis_stat:
+            analysis_stat[group_id] = (text, False)
+        last_msg, is_analysis = analysis_stat[group_id]
+        if last_msg == text:
+            if is_analysis:
+                analysis_stat[group_id] = (text, False)
+                return
+            else:
+                analysis_stat[group_id] = (text, True)
+
         if "当前版本不支持该消息类型" in text and "哔哩哔哩" not in text:
             return
         elif '请使用最新版本手机QQ查看' in text and "哔哩哔哩" not in text:
