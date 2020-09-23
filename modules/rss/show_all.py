@@ -15,7 +15,7 @@ import nonebot
 @on_command('show_all', aliases=('showall','seeall'), permission=GROUP_ADMIN|SUPERUSER)
 async def show_all(session: CommandSession):
     #rss_name = session.get('show_all', prompt='查看所有订阅')
-    # 权限判断
+    
     user_id = session.ctx['user_id']
     try:
         group_id = session.ctx['group_id']
@@ -29,7 +29,7 @@ async def show_all(session: CommandSession):
     except:
         await session.send('获取rss列表失败')
         return
-    if group_id or (user_id in hoshino.config.ROOTUSER and group_id):
+    if group_id:
         try:
             for rss_ in list_rss:
                 if str(group_id) in str(rss_.group_id):
@@ -44,7 +44,7 @@ async def show_all(session: CommandSession):
                 await session.send(msg + '共' + str(flag) + '条订阅')
         except:
             await session.send('本群还没有任何订阅！')
-    elif user_id in hoshino.config.ROOTUSER:
+    elif user_id:
         # 获取、处理信息
         try:
             for rss_ in list_rss:

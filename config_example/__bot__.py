@@ -35,9 +35,14 @@ showlottery = True   #是否显示互动抽奖(主要是bilibili)信息，默认
 blockquote = True    #是否显示转发的内容(主要是微博)，默认打开
 API_ROOT = 'http://127.0.0.1:5700'
 RSS_PROXY = '127.0.0.1:10809'    # 代理地址
-ROOTUSER = []    # 管理员qq,支持多管理员，逗号分隔 如 [1,2,3] 注意
+###废弃ROOTUSER,只使用SUPERUSERS
+#ROOTUSER = []    # 管理员qq,支持多管理员，逗号分隔 如 [1,2,3] 注意
 RSSHUB = 'https://rsshub.app'     # rsshub订阅地址
 RSSHUB_backup = [] # 备用rsshub地址 填写示例 ['https://rsshub.app','https://rsshub.app']
+#群组订阅的默认参数
+add_uptime = 10    #默认订阅更新时间
+add_proxy = False  #默认是否启用代理
+
 DELCACHE = 3     #缓存删除间隔 天
 LIMT = 50 # 缓存rss条数
 

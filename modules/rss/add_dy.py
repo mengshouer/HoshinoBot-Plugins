@@ -7,28 +7,75 @@ from .RSSHub import rsstrigger as TR
 import logging
 from nonebot.log import logger
 import hoshino
+from nonebot.permission import *
 import nonebot
 import re
 
 # on_command 装饰器将函数声明为一个命令处理器
 # 这里 uri 为命令的名字，同时允许使用别名
-@on_command('add', aliases=('订阅', 'dy', 'DY'))
+@on_command('add', aliases=('订阅', 'dy', 'DY', 'rss', 'adddy', 'addrss'), permission=GROUP_ADMIN|SUPERUSER)
 async def add(session: CommandSession):
     # 从会话状态（session.state）中获取订阅信息链接(link)，如果当前不存在，则询问用户
     rss_dy_link = session.get('add', prompt='要订阅的信息不能为空呢，请重新输入\n输入样例：\ntest /twitter/user/xx 11,11 -1 5 1 0 \n订阅名 订阅地址 qq(,分隔，为空-1) 群号(,分隔，为空-1) 更新时间(分钟，可选) 1/0(代理，可选) 1/0(第三方订阅链接，可选) 1/0(翻译,可选) 1/0(仅标题,可选)')
-    # 权限判断
     user_id = session.ctx['user_id']
-    if user_id in hoshino.config.ROOTUSER:
-        # 获取、处理信息
-        dy = rss_dy_link.split(' ')
-        # await session.send('')#反馈
-        # print('\n\n\n'+str(len(dy)),dy[0]+'\n\n\n')
+    try:
+        group_id = session.ctx['group_id']
+    except:
+        group_id = None
+
+
+    # 获取、处理信息
+    dy = rss_dy_link.split(' ')
+    # await session.send('')#反馈
+    # print('\n\n\n'+str(len(dy)),dy[0]+'\n\n\n')
+    try:
+        name = dy[0]
+        name=re.sub(r'\?|\*|\:|\"|\<|\>|\\|/|\|', '_', name)
+        if name=='rss':
+            name = 'rss_'
+        url = dy[1]
+        flag = 0
         try:
-            name = dy[0]
-            name=re.sub(r'\?|\*|\:|\"|\<|\>|\\|/|\|', '_', name)
-            if name=='rss':
-                name = 'rss_'
-            url = dy[1]
+            list_rss = RWlist.readRss()
+            for old in list_rss:
+                if old.name == name or old.url == url:
+                    old_rss = old
+                    flag = 1
+        except:
+            print("error")
+        if url.startswith("http"):
+            notrsshub = True
+        else:
+            notrsshub = False
+        if group_id:
+            if flag == 0:
+                if len(dy) > 2:
+                    only_title = bool(int(dy[2]))
+                else:
+                    only_title = False
+                if len(dy) > 3:
+                    only_pic = bool(int(dy[3]))
+                else:
+                    only_pic = False
+                translation = False
+                times = int(hoshino.config.add_uptime)
+                proxy = hoshino.config.add_proxy
+                if user_id in hoshino.config.SUPERUSERS and len(dy) > 4:
+                    proxy = bool(int(dy[4]))
+                if user_id in hoshino.config.SUPERUSERS and len(dy) > 5:
+                    times = int(dy[5])
+                user_id = -1
+            else:
+                if str(group_id) not in str(old_rss.group_id):
+                    list_rss.remove(old_rss)
+                    old_rss.group_id.append(str(group_id))
+                    list_rss.append(old_rss)
+                    RWlist.writeRss(list_rss)
+                    await session.send(old_rss.name + '订阅成功！')
+                else:
+                    await session.send('订阅已经存在！')
+                return
+        elif user_id and flag == 0:
             user_id = dy[2]
             group_id = dy[3]
             if len(dy) > 4:
@@ -40,52 +87,41 @@ async def add(session: CommandSession):
             else:
                 proxy = False
             if len(dy) > 6:
-                notrsshub = bool(int(dy[6]))
-            else:
-                notrsshub = False
-            if len(dy) > 7:
-                translation = bool(int(dy[7]))
+                translation = bool(int(dy[6]))
             else:
                 translation = False
-            if len(dy) > 8:
-                only_title = bool(int(dy[8]))
+            if len(dy) > 7:
+                only_title = bool(int(dy[7]))
             else:
                 only_title = False
-            if len(dy) > 9:
-                only_pic = bool(int(dy[9]))
+            if len(dy) > 8:
+                only_pic = bool(int(dy[8]))
             else:
                 only_pic = False
-            rss = RSS_class.rss(name, url, user_id, group_id, times, proxy, notrsshub,translation,only_title,only_pic)
-            # 写入订阅配置文件 # 先读看是否重复再写
-            flag = 0
-            bot = nonebot.get_bot()
-            try:
-                list_rss = RWlist.readRss()
-                for old in list_rss:
-                    if old.name == rss.name or old.url == rss.url:
-                        flag = 1
-                if flag == 0:
-                    list_rss.append(rss)
-                    RWlist.writeRss(list_rss)
-                else:
-                    # 向用户发送失败信息
-                    logger.info('添加' + rss.name + '失败，已存在')
-                    await session.send('订阅名或订阅链接已经存在！')
-            except:
-                list_rss = []
-                list_rss.append(rss)
-                RWlist.writeRss(list_rss)
-            if flag == 0:
-                # 加入订阅任务队列
-                TR.rss_trigger(times, rss)
-                logger.info('添加' + rss.name + '成功')
-                # 向用户发送成功信息
-                await session.send(rss.name + '订阅成功！')
+        else:
+            # 向用户发送失败信息
+            logger.info('添加' + rss.name + '失败，已存在')
+            await session.send('订阅名或订阅链接已经存在！')
+            return
+        rss = RSS_class.rss(name, url, str(user_id), str(group_id), times, proxy, notrsshub, translation, only_title, only_pic)
+        print("写入")
+        # 写入订阅配置文件
+        bot = nonebot.get_bot()
+        try:
+            list_rss.append(rss)
+            RWlist.writeRss(list_rss)          
         except:
-            await session.send('参数不对哟！')
-
-    else:
-        await session.send('你没有权限进行此操作！')
+            list_rss = []
+            list_rss.append(rss)
+            RWlist.writeRss(list_rss)
+        if flag == 0:
+            # 加入订阅任务队列
+            TR.rss_trigger(times, rss)
+            logger.info('添加' + rss.name + '成功')
+            # 向用户发送成功信息
+            await session.send(rss.name + '订阅成功！')
+    except:
+        await session.send('参数不对哟！')
 
 
 # add.args_parser 装饰器将函数声明为 add 命令的参数解析器
