@@ -16,12 +16,16 @@ import re
 @on_command('add', aliases=('订阅', 'dy', 'DY', 'rss', 'adddy', 'addrss'), permission=GROUP_ADMIN|SUPERUSER)
 async def add(session: CommandSession):
     # 从会话状态（session.state）中获取订阅信息链接(link)，如果当前不存在，则询问用户
-    rss_dy_link = session.get('add', prompt='要订阅的信息不能为空呢，请重新输入\n输入样例：\ntest /twitter/user/xx 11,11 -1 5 1 0 \n订阅名 订阅地址 qq(,分隔，为空-1) 群号(,分隔，为空-1) 更新时间(分钟，可选) 1/0(代理，可选) 1/0(第三方订阅链接，可选) 1/0(翻译,可选) 1/0(仅标题,可选)')
     user_id = session.ctx['user_id']
     try:
         group_id = session.ctx['group_id']
     except:
         group_id = None
+    
+    if group_id:
+        rss_dy_link = session.get('add', prompt='要订阅的信息不能为空呢，请重新输入\n输入样例：\ntest /twitter/user/xx \n具体查看https://github.com/mengshouer/HoshinoBot-Plugins/wiki/RSS')
+    else:
+        rss_dy_link = session.get('add', prompt='要订阅的信息不能为空呢，请重新输入\n输入样例：\ntest /twitter/user/xx 11,11 -1 5 1 0 \n订阅名 订阅地址 qq(,分隔，为空-1) 群号(,分隔，为空-1) 更新时间(分钟，可选) 1/0(代理，可选) 1/0(翻译,可选) 1/0(仅标题,可选) 1/0(仅图片,可选)')
 
 
     # 获取、处理信息
