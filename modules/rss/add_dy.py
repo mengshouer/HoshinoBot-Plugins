@@ -42,9 +42,12 @@ async def add(session: CommandSession):
         try:
             list_rss = RWlist.readRss()
             for old in list_rss:
-                if old.name == name or old.url == url:
+                if old.name == name:
                     old_rss = old
                     flag = 1
+                if old.url == url:
+                    old_rss = old
+                    flag = 2
         except:
             print("error")
         if url.startswith("http"):
@@ -70,14 +73,17 @@ async def add(session: CommandSession):
                     times = int(dy[5])
                 user_id = -1
             else:
-                if str(group_id) not in str(old_rss.group_id):
-                    list_rss.remove(old_rss)
-                    old_rss.group_id.append(str(group_id))
-                    list_rss.append(old_rss)
-                    RWlist.writeRss(list_rss)
-                    await session.send(old_rss.name + '订阅成功！')
+                if flag == 2:
+                    if str(group_id) not in str(old_rss.group_id):
+                        list_rss.remove(old_rss)
+                        old_rss.group_id.append(str(group_id))
+                        list_rss.append(old_rss)
+                        RWlist.writeRss(list_rss)
+                        await session.send(str(url) + '订阅链接已存在，订阅名使用已有的订阅名，订阅成功！')
+                    else:
+                        await session.send('订阅链接已经存在！')
                 else:
-                    await session.send('订阅已经存在！')
+                    await session.send('订阅名已存在，请更换个订阅名订阅')
                 return
         elif user_id and flag == 0:
             user_id = dy[2]
