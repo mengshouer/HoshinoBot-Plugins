@@ -45,12 +45,12 @@ async def add(session: CommandSession):
                 if old.name == name:
                     old_rss = old
                     flag = 1
-                if old.url == url:
+                if str(old.url).lower() == str(url).lower():
                     old_rss = old
                     flag = 2
         except:
             print("error")
-        if url.startswith("http"):
+        if str(url).lower().startswith("http"):
             notrsshub = True
         else:
             notrsshub = False
