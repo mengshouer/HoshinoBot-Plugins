@@ -1,0 +1,13 @@
+googletrans
+httpx
+emoji
+nonebot
+requests
+feedparser
+apscheduler
+Pillow
+pyquery
+retrying
+lxml
+aiohttp
+
