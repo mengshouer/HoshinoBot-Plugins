@@ -31,8 +31,10 @@ ZIP_SIZE = 3 * 1024
 appid = ""        #可选，百度翻译接口appid，http://api.fanyi.baidu.com/获取
 secretKey = ""   #可选，百度翻译接口secretKey，http://api.fanyi.baidu.com/获取
 
-showlottery = True   #是否显示互动抽奖(主要是bilibili)信息，默认打开
-blockquote = True    #是否显示转发的内容(主要是微博)，默认打开
+showBlockword = True   #是否显示内含屏蔽词的信息信息，默认打开
+Blockword = ["互动抽奖","微博抽奖平台"]   #屏蔽词填写 支持正则,看里面格式就明白怎么添加了吧(
+
+blockquote = True    #是否显示转发的内容(主要是微博)，默认打开，如果关闭还有转发的信息的话，可以自行添加进屏蔽词(但是这整条消息就会没)
 API_ROOT = 'http://127.0.0.1:5700'
 RSS_PROXY = '127.0.0.1:10809'    # 代理地址
 ###废弃ROOTUSER,只使用SUPERUSERS
