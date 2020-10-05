@@ -37,17 +37,22 @@ async def add(session: CommandSession):
         name=re.sub(r'\?|\*|\:|\"|\<|\>|\\|/|\|', '_', name)
         if name=='rss':
             name = 'rss_'
-        url = dy[1]
+        try:
+            url = dy[1]
+        except:
+            url = None
         flag = 0
         try:
             list_rss = RWlist.readRss()
             for old in list_rss:
-                if old.name == name:
+                if old.name == name and not url:
                     old_rss = old
                     flag = 1
-                if str(old.url).lower() == str(url).lower():
+                elif str(old.url).lower() == str(url).lower():
                     old_rss = old
                     flag = 2
+                elif old.name == name:
+                    flag = 3
         except:
             print("error")
         if str(url).lower().startswith("http"):
@@ -55,7 +60,7 @@ async def add(session: CommandSession):
         else:
             notrsshub = False
         if group_id:
-            if flag == 0:
+            if flag == 0 and url:
                 if len(dy) > 2:
                     only_title = bool(int(dy[2]))
                 else:
@@ -73,7 +78,14 @@ async def add(session: CommandSession):
                     times = int(dy[5])
                 user_id = -1
             else:
-                if flag == 2:
+                if flag == 1:
+                    if str(group_id) not in str(old_rss.group_id):
+                        list_rss.remove(old_rss)
+                        old_rss.group_id.append(str(group_id))
+                        list_rss.append(old_rss)
+                        RWlist.writeRss(list_rss)
+                        await session.send(str(name) + '订阅名已存在，自动加入现有订阅，订阅地址为：' + str(old_rss.url))
+                elif flag == 2:
                     if str(group_id) not in str(old_rss.group_id):
                         list_rss.remove(old_rss)
                         old_rss.group_id.append(str(group_id))
@@ -82,6 +94,8 @@ async def add(session: CommandSession):
                         await session.send(str(url) + '订阅链接已存在，订阅名使用已有的订阅名，订阅成功！')
                     else:
                         await session.send('订阅链接已经存在！')
+                elif not url:
+                    await session.send('订阅名不存在！')
                 else:
                     await session.send('订阅名已存在，请更换个订阅名订阅')
                 return
