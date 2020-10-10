@@ -18,16 +18,12 @@ async def set_group(session: CommandSession):
     parser = ArgumentParser(session=session, usage=USAGE)
     parser.add_argument('-ls', '--list', action='store_true')
     parser.add_argument('-l', '--leave', type=int, default=0)
-    parser.add_argument('-a', '--add', type=int, default=0)
     args = parser.parse_args(session.argv)
     if args.list:
         await ls_group(session)
     elif args.leave:
         gid = args.leave
         await leave_group(session, gid)
-    elif args.add:
-        gid = args.add
-        await add_group(session, gid)
     else:
         await session.finish(USAGE)
 
