@@ -48,7 +48,7 @@ async def add(session: CommandSession):
                 if old.name == name and not url:
                     old_rss = old
                     flag = 1
-                elif str(old.url).lower() == str(url).lower():
+                elif str(old.url).lower() in str(url).lower():
                     old_rss = old
                     flag = 2
                 elif old.name == name:
@@ -78,20 +78,16 @@ async def add(session: CommandSession):
                     times = int(dy[5])
                 user_id = -1
             else:
-                if flag == 1:
+                if flag == 1 or flag == 2:
                     if str(group_id) not in str(old_rss.group_id):
                         list_rss.remove(old_rss)
                         old_rss.group_id.append(str(group_id))
                         list_rss.append(old_rss)
                         RWlist.writeRss(list_rss)
-                        await session.send(str(name) + '订阅名已存在，自动加入现有订阅，订阅地址为：' + str(old_rss.url))
-                elif flag == 2:
-                    if str(group_id) not in str(old_rss.group_id):
-                        list_rss.remove(old_rss)
-                        old_rss.group_id.append(str(group_id))
-                        list_rss.append(old_rss)
-                        RWlist.writeRss(list_rss)
-                        await session.send(str(url) + '订阅链接已存在，订阅名使用已有的订阅名，订阅成功！')
+                        if flag == 1:
+                            await session.send(str(name) + '订阅名已存在，自动加入现有订阅，订阅地址为：' + str(old_rss.url))
+                        else:
+                            await session.send(str(url) + '订阅链接已存在，订阅名使用已有的订阅名"' + str(old_rss.name) + '"，订阅成功！')
                     else:
                         await session.send('订阅链接已经存在！')
                 elif not url:
