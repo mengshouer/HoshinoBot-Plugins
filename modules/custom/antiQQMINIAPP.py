@@ -5,12 +5,9 @@ from hoshino import Service, util
 
 sv = Service('antiMINIAPP')
 
-bili_url = ['www.bilibili.com/video', 'b23.tv/', '当前版本不支持该消息类型',
-            '请使用最新版本手机QQ查看', '哔哩哔哩']
-
 analysis_stat = {}   # group_id: (msg, is_analysis)
 
-@sv.on_keyword(bili_url)
+@sv.on_rex(r'(www.bilibili.com/video)|(b23.tv/)|(^(BV|bv)([0-9A-Za-z]{10}))|(^(av|AV)([0-9]+)(/.*|\\?.*|)$)|(当前版本不支持该消息类型)|(请使用最新版本手机QQ查看)|(哔哩哔哩)')
 async def bili_keyword(bot, ev):
     group_id = ev.group_id
     try:
