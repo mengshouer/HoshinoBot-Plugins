@@ -21,7 +21,6 @@ async def show_all(session: CommandSession):
         group_id = session.ctx['group_id']
     except:
         group_id = None
-    #print(type(user_id),type(config.ROOTUSER))
     flag = 0
     msg = ''
     try:

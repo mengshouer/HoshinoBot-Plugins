@@ -1,4 +1,4 @@
-import hoshino
+from . import __config__ as cf
 class rss:
     # 定义基本属性
     name = '' # 订阅名
@@ -31,4 +31,4 @@ class rss:
         if self.notrsshub :
             return self.url
         else:
-            return hoshino.config.RSSHUB+self.url
+            return cf.RSSHUB+self.url

@@ -10,6 +10,7 @@ import hoshino
 from nonebot.permission import *
 import nonebot
 import re
+from .RSSHub import __config__ as cf
 
 # on_command 装饰器将函数声明为一个命令处理器
 # 这里 uri 为命令的名字，同时允许使用别名
@@ -70,8 +71,8 @@ async def add(session: CommandSession):
                 else:
                     only_pic = False
                 translation = False
-                times = int(hoshino.config.add_uptime)
-                proxy = hoshino.config.add_proxy
+                times = int(cf.add_uptime)
+                proxy = cf.add_proxy
                 if user_id in hoshino.config.SUPERUSERS and len(dy) > 4:
                     proxy = bool(int(dy[4]))
                 if user_id in hoshino.config.SUPERUSERS and len(dy) > 5:

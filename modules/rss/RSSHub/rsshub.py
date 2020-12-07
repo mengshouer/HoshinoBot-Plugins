@@ -25,10 +25,12 @@ import emoji
 import socket
 import hashlib
 import random
+from . import __config__ as cf
+
 # 存储目录
 file_path = './data/'
 #代理
-proxy = hoshino.config.RSS_PROXY
+proxy = cf.RSS_PROXY
 proxies = {
     'http': 'http://' + proxy,
     'https': 'https://' + proxy,
@@ -59,9 +61,9 @@ async def getRSS(rss:RSS_class.rss)->list:# 链接，订阅名
                     #    print(r.content)
                 except BaseException as e:
                     logger.error(e)
-                    if not rss.notrsshub and hoshino.config.RSSHUB_backup:
-                        logger.error('RSSHub :' + hoshino.config.RSSHUB + ' 访问失败 ！使用备用RSSHub 地址！')
-                        for rsshub_url in hoshino.config.RSSHUB_backup:
+                    if not rss.notrsshub and cf.RSSHUB_backup:
+                        logger.error('RSSHub :' + cf.RSSHUB + ' 访问失败 ！使用备用RSSHub 地址！')
+                        for rsshub_url in cf.RSSHUB_backup:
                             async with httpx.AsyncClient(proxies=Proxy) as client:
                                 try:
                                     r = await client.get(rsshub_url + rss.url)
@@ -167,9 +169,9 @@ async def dowimg(url:str,img_proxy:bool)->str:
         async with httpx.AsyncClient(proxies=Proxy) as client:
             try:
                 print(url)
-                if hoshino.config.CLOSE_PIXIV_CAT and url.find('pixiv.cat') >= 0:
+                if cf.CLOSE_PIXIV_CAT and url.find('pixiv.cat') >= 0:
                     img_proxy = False
-                    headers = {'referer': hoshino.config.PIXIV_REFERER}
+                    headers = {'referer': cf.PIXIV_REFERER}
                     img_id = re.sub('https://pixiv.cat/', '', url)
                     img_id = img_id[:-4]
                     info_list = img_id.split('-')
@@ -180,7 +182,7 @@ async def dowimg(url:str,img_proxy:bool)->str:
                         url = req_json['response'][0]['image_urls']['large']
 
                     # 使用第三方反代服务器
-                    url = re.sub('i.pximg.net', hoshino.config.PIXIV_PROXY, url)
+                    url = re.sub('i.pximg.net', cf.PIXIV_PROXY, url)
                     pic = await client.get(url, headers=headers ,timeout=100.0)
                 else:
                     pic = await client.get(url)
@@ -188,7 +190,7 @@ async def dowimg(url:str,img_proxy:bool)->str:
 
                 # 大小控制，图片压缩
                 #print(len(pic.content)/(1024*1024))
-                if (len(pic.content)/1024 > hoshino.config.ZIP_SIZE):
+                if (len(pic.content)/1024 > cf.ZIP_SIZE):
                     filename = await zipPic(pic.content,name)
                 else:
                     if len(file_suffix[1]) > 0:
@@ -202,7 +204,7 @@ async def dowimg(url:str,img_proxy:bool)->str:
                     with codecs.open(img_path + filename, "wb") as dump_f:
                         dump_f.write(pic.content)
 
-                if hoshino.config.IsLinux:
+                if cf.IsLinux:
                     imgs_name = img_path + filename
                     if len(imgs_name) > 0:
                         imgs_name = os.getcwd() + re.sub(r'\./|\\', r'/', imgs_name)
@@ -229,7 +231,7 @@ async def zipPic(content,name):
     w, h = im.size
     print('Original image size: %sx%s' % (w, h))
     # 算出缩小比
-    Proportion = int(len(content)/(hoshino.config.ZIP_SIZE * 1024))
+    Proportion = int(len(content)/(cf.ZIP_SIZE * 1024))
     print('算出的缩小比:'+str(Proportion))
     # 缩放
     im.thumbnail((w // Proportion, h // Proportion))
@@ -266,14 +268,14 @@ async def checkstr(rss_str:str,img_proxy:bool,translation:bool,only_pic:bool)->s
     doc_rss = pq(rss_str)
     rss_str = str(doc_rss)
 
-    if hoshino.config.showBlockword == False:
-        match = re.findall("|".join(hoshino.config.Blockword), rss_str)
+    if cf.showBlockword == False:
+        match = re.findall("|".join(cf.Blockword), rss_str)
         if match:
             print('内含屏蔽词，pass，可能会报"抓取失败，请检查订阅地址是否正确！E:can only concatenate str (not "NoneType") to str"错误，无视本条')
             return
 
     # 处理一些标签
-    if hoshino.config.blockquote == True:
+    if cf.blockquote == True:
         rss_str = re.sub('<blockquote>|</blockquote>', '', rss_str)
     else:
         rss_str = re.sub('<blockquote.*>', '', rss_str)
@@ -321,7 +323,7 @@ async def checkstr(rss_str:str,img_proxy:bool,translation:bool,only_pic:bool)->s
         rss_str_tl = re.sub(re.escape(str(img)), '', rss_str_tl)
         img_path = await dowimg(img.attr("src"), img_proxy)
         if len(img_path) > 0:
-            if hoshino.config.IsLinux:
+            if cf.IsLinux:
                 rss_str = re.sub(re.escape(str(img)),
                                  r'[CQ:image,file=' + str(img_path) + ']',
                                  rss_str)
@@ -337,7 +339,7 @@ async def checkstr(rss_str:str,img_proxy:bool,translation:bool,only_pic:bool)->s
         rss_str_tl = re.sub(re.escape(str(video)), '', rss_str_tl)
         img_path = await dowimg(video.attr("poster"), img_proxy)
         if len(img_path) > 0:
-            if hoshino.config.IsLinux:
+            if cf.IsLinux:
                 rss_str = re.sub(re.escape(str(img)),
                                  r'[CQ:image,file=' + str(img_path) + ']',
                                  rss_str)
@@ -354,9 +356,9 @@ async def checkstr(rss_str:str,img_proxy:bool,translation:bool,only_pic:bool)->s
         print("开始翻译")
         # rss_str_tl = re.sub(r'\n', ' ', rss_str_tl)
         try:
-            if hoshino.config.appid != "" and hoshino.config.secretKey != "":
-                appid = hoshino.config.appid
-                secretKey = hoshino.config.secretKey
+            if cf.appid != "" and cf.secretKey != "":
+                appid = cf.appid
+                secretKey = cf.secretKey
                 url = f'http://api.fanyi.baidu.com/api/trans/vip/translate'
                 salt = str(random.randint(32768, 65536))
                 sign = hashlib.md5((appid+rss_str_tl+salt+secretKey).encode()).hexdigest()
@@ -404,10 +406,10 @@ def checkUpdate(new, old) -> list:
 
     c = [];
     # 防止 rss 超过设置的缓存条数
-    if len(a)>= hoshino.config.LIMT:
-        LIMT=len(a) + hoshino.config.LIMT
+    if len(a)>= cf.LIMT:
+        LIMT=len(a) + cf.LIMT
     else:
-        LIMT=hoshino.config.LIMT
+        LIMT=cf.LIMT
 
     for i in a:
         count = 0;
@@ -438,10 +440,10 @@ def readRss(name):
 # 写入记录
 def writeRss(new, name):
     # 防止 rss 超过设置的缓存条数
-    if len(new.entries) >= hoshino.config.LIMT:
-        LIMT = len(new.entries) + hoshino.config.LIMT
+    if len(new.entries) >= cf.LIMT:
+        LIMT = len(new.entries) + cf.LIMT
     else:
-        LIMT = hoshino.config.LIMT
+        LIMT = cf.LIMT
     try:
         old = readRss(name)
         print(len(old['entries']))
