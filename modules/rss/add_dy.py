@@ -101,6 +101,10 @@ async def add(session: CommandSession):
             group_id = dy[3]
             if len(dy) > 4:
                 times = int(dy[4])
+                if times < 0:
+                    times = -times
+                elif times == 0:
+                    times = 1
             else:
                 times = 5
             if len(dy) > 5:

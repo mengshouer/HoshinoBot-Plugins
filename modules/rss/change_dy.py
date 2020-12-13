@@ -62,6 +62,9 @@ async def change(session: CommandSession):
                                 rss_tmp.group_id = []
                     if info_this[0] == 'uptime':
                         rss_tmp.time = int(info_this[1])
+                        if rss_tmp.time <= 0:
+                            await session.send('修改的时间小于或等于0，修改失败！')
+                            return
                     if info_this[0] == 'proxy':
                         rss_tmp.img_proxy = bool(int(info_this[1]))
                         #print(bool(info_this[1]))
