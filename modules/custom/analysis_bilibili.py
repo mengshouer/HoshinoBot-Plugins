@@ -1,13 +1,13 @@
-import re, json, requests, aiohttp, asyncio
+import re, json, aiohttp, asyncio
 import lxml.html
 import urllib.parse
 from hoshino import Service, util
 
-sv = Service('antiMINIAPP')
+sv = Service('analysis_bilibili')
 
 analysis_stat = {}   # group_id: (msg, is_analysis)
 
-@sv.on_rex(r'(www.bilibili.com/video)|(b23.tv/)|(^(BV|bv)([0-9A-Za-z]{10}))|(^(av|AV)([0-9]+)(/.*|\\?.*|)$)|(当前版本不支持该消息类型)|(请使用最新版本手机QQ查看)|(哔哩哔哩)')
+@sv.on_rex(r'(www.bilibili.com/video)|(b23.tv/)|(^(BV|bv)([0-9A-Za-z]{10}))|(^(av|AV)([0-9]+)(/.*|\\?.*|)$)|(当前版本不支持该消息类型)|(请使用最新版本手机QQ查看)|(小程序)')
 async def bili_keyword(bot, ev):
     group_id = ev.group_id
     try:
@@ -57,7 +57,9 @@ async def extract(text:str):
         elif bvid:
             url = f'https://api.bilibili.com/x/web-interface/view?bvid={bvid[0]}'
         else:
-            r = requests.get(f'https://b23.tv/{b23[1]}')
+            url = f'https://b23.tv/{b23[1]}'
+            async with aiohttp.request('GET', url, timeout=aiohttp.client.ClientTimeout(10)) as resp:
+                r = str(resp.url)
             aid = re.compile(r'av\d+').search(r.url)
             bvid = re.compile(r'BV\w+').search(r.url)
             if bvid:
@@ -90,7 +92,9 @@ async def search_bili_by_title(title: str):
 
 async def video_detail(url):
     try:
-        res = requests.get(url).json()['data']
+        async with aiohttp.request('GET', url, timeout=aiohttp.client.ClientTimeout(10)) as resp:
+            res = await resp.json()
+            res = res['data']
         vurl = f"URL：https://www.bilibili.com/video/av{res['aid']}\n"
         title = f"标题：{res['title']}\n"
         up = f"UP主：{res['owner']['name']} (https://space.bilibili.com/{res['owner']['mid']})\n"
