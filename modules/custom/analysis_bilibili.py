@@ -60,8 +60,8 @@ async def extract(text:str):
             url = f'https://b23.tv/{b23[1]}'
             async with aiohttp.request('GET', url, timeout=aiohttp.client.ClientTimeout(10)) as resp:
                 r = str(resp.url)
-            aid = re.compile(r'av\d+').search(r.url)
-            bvid = re.compile(r'BV\w+').search(r.url)
+            aid = re.compile(r'av\d+').search(r)
+            bvid = re.compile(r'BV\w+').search(r)
             if bvid:
                 url = f'https://api.bilibili.com/x/web-interface/view?bvid={bvid[0]}'
             else:
