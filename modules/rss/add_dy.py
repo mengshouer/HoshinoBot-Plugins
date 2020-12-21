@@ -97,8 +97,11 @@ async def add(session: CommandSession):
                     await session.send('订阅名已存在，请更换个订阅名订阅')
                 return
         elif user_id and flag == 0:
-            user_id = dy[2]
-            group_id = dy[3]
+            try:
+                user_id = dy[2]
+                group_id = dy[3]
+            except:
+                group_id = "-1"
             if len(dy) > 4:
                 times = int(dy[4])
                 if times < 0:
@@ -129,7 +132,6 @@ async def add(session: CommandSession):
             await session.send('订阅名或订阅链接已经存在！')
             return
         rss = RSS_class.rss(name, url, str(user_id), str(group_id), times, proxy, notrsshub, translation, only_title, only_pic)
-        print("写入")
         # 写入订阅配置文件
         bot = nonebot.get_bot()
         try:
