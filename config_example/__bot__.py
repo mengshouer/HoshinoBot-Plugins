@@ -43,5 +43,6 @@ MODULES_ON = {
     # 'translate',
     # 'twitter',
     'rss',
-    'custom'
+    'custom',
+    'custom_reply'
 }
