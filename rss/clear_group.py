@@ -14,7 +14,7 @@ file_path = './data/'
 
 # on_command 装饰器将函数声明为一个命令处理器
 # 这里 uri 为命令的名字，同时允许使用别名
-@on_command('cleargroup', permission=GROUP_ADMIN|SUPERUSER)
+@on_command('clearrss', aliases=('cleardy','rssclear') permission=GROUP_ADMIN|SUPERUSER)
 async def cleargroup(session: CommandSession):
     bot = session.bot
     try:
