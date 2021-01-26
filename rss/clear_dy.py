@@ -12,7 +12,7 @@ import copy as cp
 # 存储目录
 file_path = './data/'
 
-@on_command('clearrss', aliases=('cleardy','rssclear') permission=GROUP_ADMIN|SUPERUSER)
+@on_command('clearrss', aliases=('cleardy','rssclear') permission=SUPERUSER)
 async def cleargroup(session: CommandSession):
     bot = session.bot
     # 获取bot的群列表
