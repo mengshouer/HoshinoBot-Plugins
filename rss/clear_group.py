@@ -12,11 +12,10 @@ import copy as cp
 # 存储目录
 file_path = './data/'
 
-# on_command 装饰器将函数声明为一个命令处理器
-# 这里 uri 为命令的名字，同时允许使用别名
 @on_command('clearrss', aliases=('cleardy','rssclear') permission=GROUP_ADMIN|SUPERUSER)
 async def cleargroup(session: CommandSession):
     bot = session.bot
+    # 获取bot的群列表
     try:
         self_ids = bot._wsr_api_clients.keys()
         for sid in self_ids:
@@ -27,9 +26,11 @@ async def cleargroup(session: CommandSession):
         return
     
     try:
+        # 读取rss列表
         list_rss = RWlist.readRss()
         for rss_ in list_rss:
             if rss_.group_id:
+                # 完整复制一份rss_
                 rss_tmp = cp.deepcopy(rss_)
                 i,g = 0,0
                 while g < len(rss_.group_id):
@@ -39,6 +40,7 @@ async def cleargroup(session: CommandSession):
                     g += 1
                 if i:
                     await session.send(f'{rss_.name}此次成功清理{i}个群聊！')
+                # 处理完毕，更新数据
                 if not rss_tmp.group_id and not rss_tmp.user_id:
                     list_rss.remove(rss_)
                     scheduler.remove_job(rss_.name)
