@@ -33,7 +33,7 @@ async def bili_keyword(bot, ev):
                     break
                 i += 1
         # 获取视频详细信息
-        msg = await video_detail(url)
+        msg,vurl = await video_detail(url)
 
         # 避免多个机器人解析重复推送
         if group_id not in analysis_stat:
