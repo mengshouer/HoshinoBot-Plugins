@@ -5,18 +5,21 @@ from hoshino import Service, util
 
 sv = Service('analysis_bilibili')
 
-analysis_stat = {}   # group_id: (msg, is_analysis)
+analysis_stat = {}   # analysis_stat: video_url(vurl)
 
 @sv.on_rex(r'(www.bilibili.com/video)|(b23.tv/)|(^(BV|bv)([0-9A-Za-z]{10}))|(^(av|AV)([0-9]+)(/.*|\\?.*|)$)|(当前版本不支持该消息类型)|(请使用最新版本手机QQ查看)|(小程序)')
 async def bili_keyword(bot, ev):
     group_id = ev.group_id
     try:
         text = str(ev.message).strip()
+        # 避免解析到其他小程序
         if "当前版本不支持该消息类型" in text and "哔哩哔哩" not in text:
             return
         elif '请使用最新版本手机QQ查看' in text and "哔哩哔哩" not in text:
             return
+        # 提取url
         url = await extract(text)
+        # 如果是小程序就去搜索标题
         if not url:
             pattern = re.compile(r'"desc":".*?"')
             desc = re.findall(pattern,text)
@@ -29,18 +32,18 @@ async def bili_keyword(bot, ev):
                     url = await extract(vurl)
                     break
                 i += 1
+        # 获取视频详细信息
         msg = await video_detail(url)
 
         # 避免多个机器人解析重复推送
         if group_id not in analysis_stat:
-            analysis_stat[group_id] = (msg, False)
-        last_msg, is_analysis = analysis_stat[group_id]
-        if last_msg == msg:
-            if is_analysis:
-                analysis_stat[group_id] = (msg, False)
-                return
-            else:
-                analysis_stat[group_id] = (msg, True)
+            analysis_stat[group_id] = vurl
+            last_vurl = ""
+        else:
+            last_vurl = analysis_stat[group_id]
+            analysis_stat[group_id] = vurl
+        if last_vurl == vurl:
+            return
     except Exception as e:
         msg = "Error: {}".format(type(e))
     await bot.send(ev, msg)
@@ -100,9 +103,9 @@ async def video_detail(url):
         up = f"UP主：{res['owner']['name']} (https://space.bilibili.com/{res['owner']['mid']})\n"
         desc = f"简介：{res['desc']}"
         msg = str(vurl)+str(title)+str(up)+str(desc)
-        return msg
+        return msg, vurl
     except Exception as e:
         msg = "解析出错--Error: {}".format(type(e))
-        return msg
+        return msg, None
 
     
