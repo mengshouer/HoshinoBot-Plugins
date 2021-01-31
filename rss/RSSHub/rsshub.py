@@ -19,7 +19,7 @@ import difflib
 import logging
 from nonebot.log import logger
 from . import RSS_class
-from googletrans import Translator
+from google_trans_new import google_translator
 import hoshino
 import emoji
 import socket
@@ -244,14 +244,44 @@ async def zipPic(content,name):
         im.save(img_path + name + '.png', 'png')
         return name + '.png'
 
+async def baidu_tl(rss_str_tl:str):
+    appid = cf.appid
+    secretKey = cf.secretKey
+    url = f'http://api.fanyi.baidu.com/api/trans/vip/translate'
+    salt = str(random.randint(32768, 65536))
+    sign = hashlib.md5((appid+rss_str_tl+salt+secretKey).encode()).hexdigest()
+    params = {
+        "q" : rss_str_tl,
+        "from" : "auto",
+        "to" : "zh",
+        "appid" : appid,
+        "salt" : salt,
+        "sign" : sign
+        }
+    r = requests.get(url,params=params)
+    try:
+        i = 0
+        text = ''
+        while i < len(r.json()["trans_result"]):
+            text += r.json()["trans_result"][i]["dst"] + "\n"
+            i += 1
+        text = "\n百度翻译：\n"+text
+    except:
+        if r.json()["error_code"] == "52003":
+            logger.warning("无效的appid，尝试使用谷歌翻译，错误信息："+ str(r.json()["error_msg"]))
+            text = await google_tl(rss_str_tl)
+        else:
+            logger.warning("使用百度翻译错误："+str(r.json()["error_msg"])+"，开始尝试使用谷歌翻译")
+            text = await google_tl(rss_str_tl)
+    return text
 
 async def google_tl(rss_str_tl:str):
     try:
         text = ''
-        translator = Translator()
+        translator = google_translator()
         text = emoji.demojize(rss_str_tl)
         text = re.sub(r':[A-Za-z_]*:', ' ', text)
-        text = '\n翻译：\n' + translator.translate(re.escape(text), dest='zh-CN').text
+        text = '\n谷歌翻译：\n' + str(translator.translate(re.escape(text), lang_tgt='zh'))
         text = re.sub(r'\\', '', text)
         return text
     except Exception as e:
@@ -353,45 +383,18 @@ async def checkstr(rss_str:str,img_proxy:bool,translation:bool,only_pic:bool)->s
     # 翻译
     text = ''
     if translation:
-        print("开始翻译")
+        logger.info("开始翻译")
         # rss_str_tl = re.sub(r'\n', ' ', rss_str_tl)
         try:
             if cf.appid != "" and cf.secretKey != "":
-                appid = cf.appid
-                secretKey = cf.secretKey
-                url = f'http://api.fanyi.baidu.com/api/trans/vip/translate'
-                salt = str(random.randint(32768, 65536))
-                sign = hashlib.md5((appid+rss_str_tl+salt+secretKey).encode()).hexdigest()
-                params = {
-                    "q" : rss_str_tl,
-                    "from" : "auto",
-                    "to" : "zh",
-                    "appid" : appid,
-                    "salt" : salt,
-                    "sign" : sign
-                    }
-                r = requests.get(url,params=params)
-                try:
-                    i = 0
-                    text = ''
-                    while i < len(r.json()["trans_result"]):
-                        text += r.json()["trans_result"][i]["dst"] + "\n"
-                        i += 1
-                    text = "\n翻译：\n"+text
-                except:
-                    if r.json()["error_code"] == "52003":
-                        print("无效的appid，尝试使用谷歌翻译，错误信息："+ str(r.json()["error_msg"]))
-                        text = await google_tl(rss_str_tl)
-                    else:
-                        print("使用百度翻译错误："+str(r.json()["error_msg"])+"，开始尝试使用谷歌翻译")
-                        text = await google_tl(rss_str_tl)
+                text = await baidu_tl(rss_str_tl)
             else:
-               text = await google_tl(rss_str_tl)
+                text = await google_tl(rss_str_tl)
         except Exception as e:
             text = '\n翻译失败！'+str(e)+'\n'
-    print()
-    print("rss_str+text-----"+rss_str+text)
-    print()
+    # print()
+    # print("rss_str+text-----"+rss_str+text)
+    # print()
     return rss_str+text
 
 # 检查更新

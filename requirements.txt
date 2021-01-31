@@ -1,4 +1,4 @@
-googletrans
+google_trans_new
 httpx
 emoji
 nonebot
