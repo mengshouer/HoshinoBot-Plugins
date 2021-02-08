@@ -247,7 +247,7 @@ async def zipPic(content,name):
 async def baidu_tl(rss_str_tl:str):
     appid = cf.appid
     secretKey = cf.secretKey
-    url = f'http://api.fanyi.baidu.com/api/trans/vip/translate'
+    url = f'https://api.fanyi.baidu.com/api/trans/vip/translate'
     salt = str(random.randint(32768, 65536))
     sign = hashlib.md5((appid+rss_str_tl+salt+secretKey).encode()).hexdigest()
     params = {
