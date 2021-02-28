@@ -1,22 +1,25 @@
 import re, json, aiohttp, asyncio
 import lxml.html
 import urllib.parse
-from hoshino import Service, util
+from hoshino import Service
+from hoshino.util import escape
 
 sv = Service('analysis_bilibili')
 
 analysis_stat = {}   # analysis_stat: video_url(vurl)
 
-@sv.on_rex(r'(www.bilibili.com/video)|(b23.tv/)|(^(BV|bv)([0-9A-Za-z]{10}))|(^(av|AV)([0-9]+)(/.*|\\?.*|)$)|(当前版本不支持该消息类型)|(请使用最新版本手机QQ查看)|(小程序)')
-async def bili_keyword(bot, ev):
+@sv.on_message('group')
+async def rex_bilibili(bot, ev):
     group_id = ev.group_id
+    text = escape(str(ev.message).strip())
+    patterns = r'(www.bilibili.com/video)|(b23.tv/)|(^(BV|bv)([0-9A-Za-z]{10}))|(^(av|AV)([0-9]+)(/.*|\\?.*|)$)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)'
+    match = re.compile(patterns).search(text)
+    if match:
+        msg = await bili_keyword(group_id, text)
+        await bot.send(ev, msg)
+    
+async def bili_keyword(group_id, text):
     try:
-        text = str(ev.message).strip()
-        # 避免解析到其他小程序
-        if "当前版本不支持该消息类型" in text and "哔哩哔哩" not in text:
-            return
-        elif '请使用最新版本手机QQ查看' in text and "哔哩哔哩" not in text:
-            return
         # 提取url
         url = await extract(text)
         # 如果是小程序就去搜索标题
@@ -34,7 +37,7 @@ async def bili_keyword(bot, ev):
                 i += 1
         # 获取视频详细信息
         msg,vurl = await video_detail(url)
-
+        
         # 避免多个机器人解析重复推送
         if group_id not in analysis_stat:
             analysis_stat[group_id] = vurl
@@ -46,7 +49,7 @@ async def bili_keyword(bot, ev):
             return
     except Exception as e:
         msg = "Error: {}".format(type(e))
-    await bot.send(ev, msg)
+    return msg
 
 async def extract(text:str):
     try:
