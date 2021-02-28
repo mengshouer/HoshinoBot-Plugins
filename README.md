@@ -1,4 +1,5 @@
-# Ê¹ÓÃËµÃ÷
-### requirements.txt ÊÇËùĞèµÚÈı·½Ä£¿é£¬Ê¹ÓÃÇ°ĞèÔÚµ±Ç°Ä¿Â¼ÏÂÖ´ĞĞ `pip install -r requirements.txt` °²×°Ä£¿é<br>
-ĞèÅäºÏ[Hoshino(v2)](https://github.com/Ice-Cirno/HoshinoBot)Ê¹ÓÃ<br>
-¾ßÌåÊ¹ÓÃ¿´[WIKI](https://github.com/mengshouer/HoshinoBot-Plugins/wiki)
+# ä½¿ç”¨è¯´æ˜
+### æ³¨æ„æ›´æ–°Hoshinoæœ¬ä½“ï¼Œä»¥é˜²CQç æ³¨å…¥.jpg<br>
+### requirements.txt æ˜¯æ‰€éœ€ç¬¬ä¸‰æ–¹æ¨¡å—ï¼Œä½¿ç”¨å‰éœ€åœ¨å½“å‰ç›®å½•ä¸‹æ‰§è¡Œ `pip install -r requirements.txt` å®‰è£…æ¨¡å—<br>
+éœ€é…åˆ[Hoshino(v2)](https://github.com/Ice-Cirno/HoshinoBot)ä½¿ç”¨<br>
+å…·ä½“ä½¿ç”¨çœ‹[WIKI](https://github.com/mengshouer/HoshinoBot-Plugins/wiki)
