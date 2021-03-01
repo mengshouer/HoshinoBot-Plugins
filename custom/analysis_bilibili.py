@@ -135,6 +135,6 @@ async def bangumi_detail(url):
         return msg
     except Exception as e:
         msg = "解析出错--Error: {}".format(type(e))
-        msg += f'\nhttps://www.bilibili.com/bangumi/play/{epid[0]}'
+        msg += f'\n{url}'
         return msg
     
