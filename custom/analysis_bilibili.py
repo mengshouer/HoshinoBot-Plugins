@@ -12,7 +12,7 @@ analysis_stat = {}   # analysis_stat: video_url(vurl)
 async def rex_bilibili(bot, ev):
     group_id = ev.group_id
     text = escape(str(ev.message).strip())
-    patterns = r'(www.bilibili.com/video)|(b23.tv)|(^(BV|bv)([0-9A-Za-z]{10}))|(^(av|AV)([0-9]+)(/.*|\\?.*|)$)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)'
+    patterns = r'(www.bilibili.com/video)|(www.bilibili.com/bangumi)|(b23.tv)|(^(BV|bv)([0-9A-Za-z]{10}))|(^(av|AV)([0-9]+)(/.*|\\?.*|)$)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)'
     match = re.compile(patterns).search(text)
     if match:
         msg = await bili_keyword(group_id, text)
@@ -35,10 +35,13 @@ async def bili_keyword(group_id, text):
                     url = await extract(vurl)
                     break
                 i += 1
-        if "https://www.bilibili.com/bangumi/play/ep" in url:
-            return url
+        
         # 获取视频详细信息
-        msg,vurl = await video_detail(url)
+        if "www.bilibili.com/bangumi/play/ep" in url:
+            msg = await bangumi_detail(url)
+            vurl = url
+        else:
+            msg,vurl = await video_detail(url)
         
         # 避免多个机器人解析重复推送
         if group_id not in analysis_stat:
@@ -58,12 +61,15 @@ async def extract(text:str):
         aid = re.compile(r'(av|AV)\d+').search(text)
         bvid = re.compile(r'(BV|bv)\w+').search(text)
         b23 = re.compile(r'b23.tv\\/(\w+)').search(text)
+        epid = re.compile(r'ep\d+').search(text)
         if not b23:
             b23 = re.compile(r'b23.tv/(\w+)').search(text)
         if bvid:
             url = f'https://api.bilibili.com/x/web-interface/view?bvid={bvid[0]}'
         elif aid:
             url = f'https://api.bilibili.com/x/web-interface/view?aid={aid[0][2:]}'
+        elif epid:
+            url = f'https://www.bilibili.com/bangumi/play/{epid[0]}'
         else:
             url = f'https://b23.tv/{b23[1]}'
             async with aiohttp.request('GET', url, timeout=aiohttp.client.ClientTimeout(10)) as resp:
@@ -77,16 +83,6 @@ async def extract(text:str):
                     url = f'https://api.bilibili.com/x/web-interface/view?aid={aid[0]}'
                 else:
                     url = f'https://www.bilibili.com/bangumi/play/{epid[0]}'
-                    try:
-                        r = await resp.text()
-                        content: lxml.html.HtmlElement = lxml.html.fromstring(r)
-                        name = content.xpath('//*[@id="media_module"]/div/a/text()')
-                        detail = content.xpath('//*[@id="media_module"]/div/div[2]/a[1]/text()')
-                        pubinfo = content.xpath('//*[@id="media_module"]/div/div[2]/span/text()')
-                        description = content.xpath('//*[@id="media_module"]/div/div[3]/a/span[1]/text()')
-                        url = f"URL：{url}\n标题：{name[0]}\n类型：{detail[0]}  {pubinfo[0]}\n简介：{description[0]}"
-                    except:
-                        url = f'https://www.bilibili.com/bangumi/play/{epid[0]}'
         return url
     except:
         return None
@@ -125,4 +121,20 @@ async def video_detail(url):
     except Exception as e:
         msg = "解析出错--Error: {}".format(type(e))
         return msg, None
+
+async def bangumi_detail(url):
+    try:
+        async with aiohttp.request('GET', url, timeout=aiohttp.client.ClientTimeout(10)) as resp:
+            res = await resp.text()
+        content: lxml.html.HtmlElement = lxml.html.fromstring(res)
+        name = content.xpath('//*[@id="media_module"]/div/a/text()')
+        detail = content.xpath('//*[@id="media_module"]/div/div[2]/a[1]/text()')
+        pubinfo = content.xpath('//*[@id="media_module"]/div/div[2]/span/text()')
+        description = content.xpath('//*[@id="media_module"]/div/div[3]/a/span[1]/text()')
+        msg = f"URL：{url}\n标题：{name[0]}\n类型：{detail[0]}  {pubinfo[0]}\n简介：{description[0]}"
+        return msg
+    except Exception as e:
+        msg = "解析出错--Error: {}".format(type(e))
+        msg += f'\nhttps://www.bilibili.com/bangumi/play/{epid[0]}'
+        return msg
     
