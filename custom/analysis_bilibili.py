@@ -68,15 +68,25 @@ async def extract(text:str):
             url = f'https://b23.tv/{b23[1]}'
             async with aiohttp.request('GET', url, timeout=aiohttp.client.ClientTimeout(10)) as resp:
                 r = str(resp.url)
-            aid = re.compile(r'av\d+').search(r)
-            bvid = re.compile(r'BV\w+').search(r)
-            epid = re.compile(r'ep\d+').search(r)
-            if bvid:
-                url = f'https://api.bilibili.com/x/web-interface/view?bvid={bvid[0]}'
-            elif aid:
-                url = f'https://api.bilibili.com/x/web-interface/view?aid={aid[0]}'
-            else:
-                url = f'https://www.bilibili.com/bangumi/play/{epid[0]}'
+                aid = re.compile(r'av\d+').search(r)
+                bvid = re.compile(r'BV\w+').search(r)
+                epid = re.compile(r'ep\d+').search(r)
+                if bvid:
+                    url = f'https://api.bilibili.com/x/web-interface/view?bvid={bvid[0]}'
+                elif aid:
+                    url = f'https://api.bilibili.com/x/web-interface/view?aid={aid[0]}'
+                else:
+                    url = f'https://www.bilibili.com/bangumi/play/{epid[0]}'
+                    try:
+                        r = await resp.text()
+                        content: lxml.html.HtmlElement = lxml.html.fromstring(r)
+                        name = content.xpath('//*[@id="media_module"]/div/a/text()')
+                        detail = content.xpath('//*[@id="media_module"]/div/div[2]/a[1]/text()')
+                        pubinfo = content.xpath('//*[@id="media_module"]/div/div[2]/span/text()')
+                        description = content.xpath('//*[@id="media_module"]/div/div[3]/a/span[1]/text()')
+                        url = f"URL：{url}\n标题：{name[0]}\n类型：{detail[0]}  {pubinfo[0]}\n简介：{description[0]}"
+                    except:
+                        url = f'https://www.bilibili.com/bangumi/play/{epid[0]}'
         return url
     except:
         return None
