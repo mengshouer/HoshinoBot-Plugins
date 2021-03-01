@@ -12,7 +12,7 @@ analysis_stat = {}   # analysis_stat: video_url(vurl)
 async def rex_bilibili(bot, ev):
     group_id = ev.group_id
     text = escape(str(ev.message).strip())
-    patterns = r'(www.bilibili.com/video)|(b23.tv/)|(^(BV|bv)([0-9A-Za-z]{10}))|(^(av|AV)([0-9]+)(/.*|\\?.*|)$)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)'
+    patterns = r'(www.bilibili.com/video)|(b23.tv)|(^(BV|bv)([0-9A-Za-z]{10}))|(^(av|AV)([0-9]+)(/.*|\\?.*|)$)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)'
     match = re.compile(patterns).search(text)
     if match:
         msg = await bili_keyword(group_id, text)
@@ -35,6 +35,8 @@ async def bili_keyword(group_id, text):
                     url = await extract(vurl)
                     break
                 i += 1
+        if "https://www.bilibili.com/bangumi/play/ep" in url:
+            return url
         # 获取视频详细信息
         msg,vurl = await video_detail(url)
         
@@ -68,10 +70,13 @@ async def extract(text:str):
                 r = str(resp.url)
             aid = re.compile(r'av\d+').search(r)
             bvid = re.compile(r'BV\w+').search(r)
+            epid = re.compile(r'ep\d+').search(r)
             if bvid:
                 url = f'https://api.bilibili.com/x/web-interface/view?bvid={bvid[0]}'
-            else:
+            elif aid:
                 url = f'https://api.bilibili.com/x/web-interface/view?aid={aid[0]}'
+            else:
+                url = f'https://www.bilibili.com/bangumi/play/{epid[0]}'
         return url
     except:
         return None
@@ -110,5 +115,4 @@ async def video_detail(url):
     except Exception as e:
         msg = "解析出错--Error: {}".format(type(e))
         return msg, None
-
     
