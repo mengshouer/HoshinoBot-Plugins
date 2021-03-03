@@ -10,11 +10,13 @@ analysis_stat = {}   # analysis_stat: video_url(vurl)
 
 @sv.on_message('group')
 async def rex_bilibili(bot, ev):
-    group_id = ev.group_id
     text = escape(str(ev.message).strip())
+    if "的个人空间" in str(text):
+        return
     patterns = r'(www.bilibili.com/video)|(www.bilibili.com/bangumi)|(b23.tv)|(^(BV|bv)([0-9A-Za-z]{10}))|(^(av|AV)([0-9]+)(/.*|\\?.*|)$)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)'
     match = re.compile(patterns).search(text)
     if match:
+        group_id = ev.group_id
         msg = await bili_keyword(group_id, text)
         await bot.send(ev, msg)
     
