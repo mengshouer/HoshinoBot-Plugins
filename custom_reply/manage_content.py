@@ -15,7 +15,7 @@ async def add_custom_reply_content(session: CommandSession):
     key = content[0]
     data[key] = content[1]
     with open('CustomReplyData.json', 'w', encoding="GB2312") as f:
-        json.dump(data, f, ensure_ascii=False)
+        json.dump(data, f, indent=4, ensure_ascii=False)
         CRdata.data = data
         await session.finish(f'自定义回复"{key}"添加成功！')
         
@@ -29,7 +29,7 @@ async def del_custom_reply_content(session: CommandSession):
         del data[content]
         CRdata.data = data
         with open('CustomReplyData.json', 'w', encoding="GB2312") as f:
-            json.dump(data, f, ensure_ascii=False)
+            json.dump(data, f, indent=4, ensure_ascii=False)
             await session.send(f'自定义回复"{content}"删除成功！')
     except Exception as e:
         print(repr(e))
