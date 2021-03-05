@@ -11,15 +11,16 @@ analysis_stat = {}   # analysis_stat: video_url(vurl)
 @sv.on_message('group')
 async def rex_bilibili(bot, ev):
     text = escape(str(ev.message).strip())
-    if "的个人空间" in str(text):
-        return
-    patterns = r'(www.bilibili.com/video)|(www.bilibili.com/bangumi)|(b23.tv)|(^(BV|bv)([0-9A-Za-z]{10}))|(^(av|AV)([0-9]+)(/.*|\\?.*|)$)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)'
+    if "b23.tv" in text:
+        # 提前处理短链接，避免解析到其他的
+        text = await b23_extract(text)
+    patterns = r'(www.bilibili.com/video)|(www.bilibili.com/bangumi)|(^(BV|bv)([0-9A-Za-z]{10}))|(^(av|AV)([0-9]+)(/.*|\\?.*|)$)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)'
     match = re.compile(patterns).search(text)
     if match:
         group_id = ev.group_id
         msg = await bili_keyword(group_id, text)
         await bot.send(ev, msg)
-    
+
 async def bili_keyword(group_id, text):
     try:
         # 提取url
@@ -58,40 +59,29 @@ async def bili_keyword(group_id, text):
         msg = "Error: {}".format(type(e))
     return msg
 
+async def b23_extract(text):
+    b23 = re.compile(r'b23.tv\\/(\w+)').search(text)
+    if not b23:
+        b23 = re.compile(r'b23.tv/(\w+)').search(text)
+    url = f'https://b23.tv/{b23[1]}'
+    async with aiohttp.request('GET', url, timeout=aiohttp.client.ClientTimeout(10)) as resp:
+        r = str(resp.url)
+    return r
+
 async def extract(text:str):
     try:
         aid = re.compile(r'(av|AV)\d+').search(text)
         bvid = re.compile(r'(BV|bv)\w+').search(text)
-        b23 = re.compile(r'b23.tv\\/(\w+)').search(text)
         epid = re.compile(r'ep\d+').search(text)
         ssid = re.compile(r'ss\d+').search(text)
-        if not b23:
-            b23 = re.compile(r'b23.tv/(\w+)').search(text)
         if bvid:
             url = f'https://api.bilibili.com/x/web-interface/view?bvid={bvid[0]}'
         elif aid:
             url = f'https://api.bilibili.com/x/web-interface/view?aid={aid[0][2:]}'
         elif epid:
             url = f'https://www.bilibili.com/bangumi/play/{epid[0]}'
-        elif ssid:
-            url = f'https://www.bilibili.com/bangumi/play/{ssid[0]}'
         else:
-            url = f'https://b23.tv/{b23[1]}'
-            async with aiohttp.request('GET', url, timeout=aiohttp.client.ClientTimeout(10)) as resp:
-                r = str(resp.url)
-                # 合理猜测
-                aid = re.compile(r'av\d+').search(r)
-                bvid = re.compile(r'BV\w+').search(r)
-                epid = re.compile(r'ep\d+').search(r)
-                ssid = re.compile(r'ss\d+').search(r)
-                if bvid:
-                    url = f'https://api.bilibili.com/x/web-interface/view?bvid={bvid[0]}'
-                elif aid:
-                    url = f'https://api.bilibili.com/x/web-interface/view?aid={aid[0]}'
-                elif epid:
-                    url = f'https://www.bilibili.com/bangumi/play/{epid[0]}'
-                else:
-                    url = f'https://www.bilibili.com/bangumi/play/{ssid[0]}'
+            url = f'https://www.bilibili.com/bangumi/play/{ssid[0]}'
         return url
     except:
         return None
