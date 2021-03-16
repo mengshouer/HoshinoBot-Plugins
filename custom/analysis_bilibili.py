@@ -19,13 +19,14 @@ async def rex_bilibili(bot, ev):
     if match:
         group_id = ev.group_id
         msg = await bili_keyword(group_id, text)
-        try:
-            await bot.send(ev, msg)
-        except:
-            # 避免简介有风控内容无法发送
-            await bot.send(ev, "此次解析可能被风控，尝试去除简介后发送！")
-            msg = re.sub(r"简介.*", "", msg)
-            await bot.send(ev, msg)
+        if msg:
+            try:
+                await bot.send(ev, msg)
+            except:
+                # 避免简介有风控内容无法发送
+                await bot.send(ev, "此次解析可能被风控，尝试去除简介后发送！")
+                msg = re.sub(r"简介.*", "", msg)
+                await bot.send(ev, msg)
 
 async def bili_keyword(group_id, text):
     try:
