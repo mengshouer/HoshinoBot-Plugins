@@ -31,61 +31,62 @@ QQ、群号、去重模式前加英文逗号表示追加,-1设为空
 # 处理带多个值的订阅参数
 def handle_property(value: str, property_list: list) -> list:
     # 清空
-    if value == '-1':
+    if value == "-1":
         return []
-    value_list = value.split(',')
+    value_list = value.split(",")
     # 追加
     if value_list[0] == "":
         value_list.pop(0)
-        return property_list + [
-            i for i in value_list if i not in property_list
-        ]
+        return property_list + [i for i in value_list if i not in property_list]
     # 防止用户输入重复参数,去重并保持原来的顺序
     return list(dict.fromkeys(value_list))
 
 
 attribute_dict = {
-    'qq': 'user_id',
-    'qun': 'group_id',
-    'url': 'url',
-    'time': 'time',
-    'proxy': 'img_proxy',
-    'tl': 'translation',
-    'ot': 'only_title',
-    'op': 'only_pic',
-    'upgroup': 'is_open_upload_group',
-    'downopen': 'down_torrent',
-    'downkey': 'down_torrent_keyword',
-    'wkey': 'down_torrent_keyword',
-    'blackkey': 'black_keyword',
-    'bkey': 'black_keyword',
-    'mode': 'duplicate_filter_mode',
-    'img_num': 'max_image_number'
+    "qq": "user_id",
+    "qun": "group_id",
+    "url": "url",
+    "time": "time",
+    "proxy": "img_proxy",
+    "tl": "translation",
+    "ot": "only_title",
+    "op": "only_pic",
+    "upgroup": "is_open_upload_group",
+    "downopen": "down_torrent",
+    "downkey": "down_torrent_keyword",
+    "wkey": "down_torrent_keyword",
+    "blackkey": "black_keyword",
+    "bkey": "black_keyword",
+    "mode": "duplicate_filter_mode",
+    "img_num": "max_image_number",
 }
 
 
 # 处理要修改的订阅参数
-def handle_change_list(rss: rss_class.Rss, key_to_change: str,
-                       value_to_change: str, group_id: int):
+def handle_change_list(
+    rss: rss_class.Rss, key_to_change: str, value_to_change: str, group_id: int
+):
     # 暂时禁止群管理员修改 QQ / 群号，如要取消订阅可以使用 deldy 命令
-    if (key_to_change in ['qq', 'qun']
-            and not group_id) or key_to_change == 'mode':
+    if (key_to_change in ["qq", "qun"] and not group_id) or key_to_change == "mode":
         value_to_change = handle_property(
-            value_to_change, getattr(rss, attribute_dict[key_to_change]))
-    elif key_to_change == 'url':
+            value_to_change, getattr(rss, attribute_dict[key_to_change])
+        )
+    elif key_to_change == "url":
         rss.delete_file()
-    elif key_to_change == 'time':
-        if not re.search(r'[_*/,-]', value_to_change):
+    elif key_to_change == "time":
+        if not re.search(r"[_*/,-]", value_to_change):
             if int(float(value_to_change)) < 1:
-                value_to_change = '1'
+                value_to_change = "1"
             else:
                 value_to_change = str(int(float(value_to_change)))
-    elif key_to_change in ['proxy', 'tl', 'ot', 'op', 'upgroup', 'downopen']:
+    elif key_to_change in ["proxy", "tl", "ot", "op", "upgroup", "downopen"]:
         value_to_change = bool(int(value_to_change))
-    elif key_to_change in ['downkey', 'wkey', 'blackkey', 'bkey'] and len(
-            value_to_change.strip()) == 0:
+    elif (
+        key_to_change in ["downkey", "wkey", "blackkey", "bkey"]
+        and len(value_to_change.strip()) == 0
+    ):
         value_to_change = None
-    elif key_to_change == 'img_num':
+    elif key_to_change == "img_num":
         value_to_change = int(value_to_change)
     setattr(rss, attribute_dict.get(key_to_change), value_to_change)
 
@@ -100,7 +101,7 @@ async def change(session: CommandSession):
 
     name = change_list[0]
     change_list.pop(0)
-    rss = rss_class.Rss(name, '', '-1', '-1')
+    rss = rss_class.Rss(name, "", "-1", "-1")
     if not rss.find_name(name=name):
         await session.send(f'❌ 订阅 {name} 不存在！')
         return
@@ -112,17 +113,17 @@ async def change(session: CommandSession):
 
     try:
         for change_dict in change_list:
-            key_to_change, value_to_change = change_dict.split('=', 1)
+            key_to_change, value_to_change = change_dict.split("=", 1)
             if key_to_change in attribute_dict.keys():
                 # 对用户输入的去重模式参数进行校验
-                mode_property_set = {'', '-1', 'link', 'title', 'image', 'or'}
-                if key_to_change == 'mode' and (
-                        set(value_to_change.split(',')) - mode_property_set
-                        or value_to_change == 'or'):
+                mode_property_set = {"", "-1", "link", "title", "image", "or"}
+                if key_to_change == "mode" and (
+                    set(value_to_change.split(",")) - mode_property_set
+                    or value_to_change == "or"
+                ):
                     await session.send(f'❌ 去重模式参数错误！\n{change_dict}')
                     return
-                handle_change_list(rss, key_to_change, value_to_change,
-                                   group_id)
+                handle_change_list(rss, key_to_change, value_to_change, group_id)
             else:
                 await RSS_CHANGE.send(f'❌ 参数错误或无权修改！\n{change_dict}')
                 return
@@ -133,14 +134,14 @@ async def change(session: CommandSession):
         if group_id:
             # 隐私考虑，群组下不展示除当前群组外的群号和QQ
             # 奇怪的逻辑，群管理能修改订阅消息，这对其他订阅者不公平。
-            rss.group_id = [str(group_id), '*']
-            rss.user_id = ['*']
+            rss.group_id = [str(group_id), "*"]
+            rss.user_id = ["*"]
         await session.send(f'👏 修改成功\n{rss}')
-        logger.info(f'👏 修改成功\n{rss}')
+        logger.info(f"👏 修改成功\n{rss}")
 
     except Exception as e:
         await session.send(f'❌ 参数解析出现错误！\nE: {e}')
-        logger.error(f'❌ 参数解析出现错误！\nE: {e}')
+        logger.error(f"❌ 参数解析出现错误！\nE: {e}")
         raise
 
 

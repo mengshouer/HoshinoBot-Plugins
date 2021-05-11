@@ -7,24 +7,24 @@ from .RSS import rss_class
 async def addcookies(session: CommandSession):
     rss_cookies = session.get('addcookies', prompt='请输入\n名称 cookies\n空格分割\n获取方式：\nPC端 chrome 浏览器按 F12\n找到Consle选项卡，输入:\ndocument.cookie\n输出的字符串就是了')
 
-    dy = rss_cookies.split(' ', 1)
+    dy = rss_cookies.split(" ", 1)
 
-    rss = rss_class.Rss(name='', url='', user_id='-1', group_id='-1')
+    rss = rss_class.Rss(name="", url="", user_id="-1", group_id="-1")
     # 判断是否有该名称订阅
     try:
         name = dy[0]
-    except KeyError:
+    except IndexError:
         await session.send('❌ 输入的订阅名为空！')
         return
 
     if not rss.find_name(name=name):
-        await session.send('❌ 不存在该订阅: {}'.format(name))
+        await session.send("❌ 不存在该订阅: {}".format(name))
         return
     rss = rss.find_name(name=name)
 
     try:
         cookies = dy[1]
-    except KeyError:
+    except IndexError:
         await session.send('❌ 输入的cookies为空！')
         return
 

@@ -11,7 +11,7 @@ async def rssShowAll(session: CommandSession):
     except:
         group_id = None
 
-    rss = rss_class.Rss('', '', '-1', '-1')
+    rss = rss_class.Rss("", "", "-1", "-1")
     if group_id:
         rss_list = rss.find_group(group=str(group_id))
         if not rss_list:
@@ -24,12 +24,12 @@ async def rssShowAll(session: CommandSession):
             await session.send(str(rss_list[0]))
         else:
             flag = 0
-            info = ''
+            info = ""
             for rss_tmp in rss_list:
                 if flag % 5 == 0 and flag != 0:
                     await session.send(str(info[:-2]))
-                    info = ''
-                info += 'Name：{}\nURL：{}\n\n'.format(rss_tmp.name, rss_tmp.url)
+                    info = ""
+                info += "Name：{}\nURL：{}\n\n".format(rss_tmp.name, rss_tmp.url)
                 flag += 1
             await session.send(info + '共 {} 条订阅'.format(flag))
 

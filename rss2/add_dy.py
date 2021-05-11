@@ -14,13 +14,13 @@ async def add(session: CommandSession):
     
     rss_dy_link = session.get('add', prompt='请输入\n名称 [订阅地址]\n空格分割、[]表示可选\n私聊默认订阅到当前账号，群聊默认订阅到当前群组\n更多信息可通过 change 命令修改\nhttps://github.com/Quan666/ELF_RSS/wiki/%E4%BD%BF%E7%94%A8%E6%95%99%E7%A8%8B')
 
-    dy = rss_dy_link.split(' ')
+    dy = rss_dy_link.split(" ")
 
-    rss = rss_class.Rss(name='', url='', user_id='-1', group_id='-1')
+    rss = rss_class.Rss(name="", url="", user_id="-1", group_id="-1")
     # 判断是否有该名称订阅，有就将当前qq或群加入订阅
     try:
         name = dy[0]
-    except KeyError:
+    except IndexError:
         await session.send('❌ 输入的订阅名为空！')
         return
 
@@ -41,7 +41,7 @@ async def add(session: CommandSession):
 
     try:
         url = dy[1]
-    except KeyError:
+    except IndexError:
         await session.send('❌ 输入的订阅地址为空！')
         return
 

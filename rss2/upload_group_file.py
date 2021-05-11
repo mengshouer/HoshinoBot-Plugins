@@ -8,16 +8,20 @@ async def get_qb(session: CommandSession):
     try:
         qb = Client(config.qb_web_url)
         qb.login()
-    except BaseException as e:
-        msg = '❌ 无法连接到 qbittorrent ,请检查：\n1.是否启动程序\n2.是否勾选了“Web用户界面（远程控制）”\n3.连接地址、端口是否正确\nE: {}'.format(e)
+    except Exception as e:
+        msg = (
+            "❌ 无法连接到 qbittorrent ,请检查：\n"
+            "1.是否启动程序\n"
+            "2.是否勾选了“Web用户界面（远程控制）”\n"
+            f"3.连接地址、端口是否正确\nE: {e}"
+        )
         logger.error(msg)
         await session.send(msg)
         return None
     try:
         qb.get_default_save_path()
-    except BaseException as e:
-        msg = '❌ 无法连登录到 qbittorrent ,请检查是否勾选 “对本地主机上的客户端跳过身份验证”。\nE: {}'.format(
-            e)
+    except Exception as e:
+        msg = f"❌ 无法连登录到 qbittorrent ,请检查是否勾选 “对本地主机上的客户端跳过身份验证”。\nE: {e}"
         logger.error(msg)
         await session.send(msg)
         return None
@@ -48,30 +52,31 @@ async def check_down_status(hash_str: str, group_id: int, session: CommandSessio
     info = qb.get_torrent(hash_str)
     files = qb.get_torrent_files(hash_str)
     bot = nonebot.get_bot()
-    if info['total_downloaded'] - info['total_size'] >= 0.000000:
+    if info["total_downloaded"] - info["total_size"] >= 0.000000:
         for tmp in files:
             # 异常包起来防止超时报错导致后续不执行
             try:
                 if config.qb_down_path and len(config.qb_down_path) > 0:
-                    path = config.qb_down_path + tmp['name']
+                    path = config.qb_down_path + tmp["name"]
                 else:
-                    path = info['save_path'] + tmp['name']
+                    path = info["save_path"] + tmp["name"]
                 await upload_group_file.send(
                     f"{tmp['name']}\n"
                     f"大小：{get_size(info['total_size'])}\n"
                     f"Hash: {hash_str}\n"
-                    "开始上传")
-                await bot.call_action(action='upload_group_file',
-                                   group_id=group_id,
-                                   file=path,
-                                   name=tmp['name'])
+                    "开始上传"
+                )
+                await bot.call_action(
+                    action="upload_group_file", group_id=group_id, file=path, name=tmp["name"]
+                )
             except Exception:
                 continue
     else:
         await session.send(
-            f'Hash: {hash_str}\n'
+            f"Hash: {hash_str}\n"
             f"下载了 {round(info['total_downloaded'] / info['total_size'] * 100, 2)}%\n"
-            f"平均下载速度：{round(info['dl_speed_avg'] / 1024, 2)} KB/s")
+            f"平均下载速度：{round(info['dl_speed_avg'] / 1024, 2)} KB/s"
+        )
 
 
 @on_command('uploadfile', only_to_me=True)

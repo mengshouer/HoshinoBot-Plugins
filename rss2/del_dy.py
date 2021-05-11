@@ -8,7 +8,7 @@ from .RSS import rss_class
 from .RSS import my_trigger as tr
 
 # 存储目录
-FILE_PATH = str(str(Path.cwd()) + os.sep + 'data' + os.sep)
+FILE_PATH = str(str(Path.cwd()) + os.sep + "data" + os.sep)
 
 @on_command('deldy', aliases=('drop', '删除订阅'), permission=GROUP_ADMIN|SUPERUSER)
 async def deldy(session: CommandSession):
@@ -18,7 +18,7 @@ async def deldy(session: CommandSession):
     except:
         group_id = None
 
-    rss = rss_class.Rss('', '', '-1', '-1')
+    rss = rss_class.Rss("", "", "-1", "-1")
     if rss.find_name(name=rss_name):
         rss = rss.find_name(name=rss_name)
     else:
