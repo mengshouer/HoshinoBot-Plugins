@@ -27,7 +27,11 @@ async def deldy(session: CommandSession):
 
     if group_id:
         if rss.delete_group(group=group_id):
-            await tr.add_job(rss)
+            if not rss.group_id and not rss.user_id:
+                rss.delete_rss(rss)
+                await tr.delete_job(rss)
+            else:
+                await tr.add_job(rss)
             await session.send('👏 当前群组取消订阅 {} 成功！'.format(rss.name))
         else:
             await session.send('❌ 当前群组没有订阅： {} ！'.format(rss.name))
