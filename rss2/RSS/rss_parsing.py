@@ -123,8 +123,10 @@ async def start(rss: rss_class.Rss) -> None:
             write_item(rss=rss, new_rss=new_rss, new_item=item)
             continue
         # 检查是否只推送有图片的消息
-        if rss.only_pic and not re.search("<img.+?>", item["summary"]):
-            logger.info("已开启仅图片，该消息没有图片，将跳过")
+        if (rss.only_pic or rss.only_has_pic) and not re.search(
+            r"<img.+?>|\[img]", item["summary"]
+        ):
+            logger.info(f"{rss.name} 已开启仅图片/仅含有图片，该消息没有图片，将跳过")
             write_item(rss=rss, new_rss=new_rss, new_item=item)
             continue
 
@@ -543,6 +545,7 @@ async def download_image_detail(url: str, proxy: bool):
             referer = re.findall("([hH][tT]{2}[pP][sS]?://.*?)/.*?", url)[0]
             headers = {"referer": referer}
             try:
+                url = re.sub('https://pbs.twimg.com/', 'https://p.snowfox.workers.dev/https/pbs.twimg.com/', url)
                 pic = await client.get(url, headers=headers)
             except httpx.ConnectError as e:
                 logger.error(f"有可能需要开启代理！ {e}")
@@ -618,7 +621,7 @@ async def handle_html_tag(html, translation: bool) -> str:
     rss_str = re.sub(r"(\[.*?=.*?])|(\[/.*?])", "", rss_str)
 
     # 处理一些 HTML 标签
-    rss_str = re.sub("<br/><br/>|<br><br>|<br>|<br/>", "\n", rss_str)
+    rss_str = re.sub("<br ?/?><br ?/?>|<br ?/?>|<hr ?/?>", "\n", rss_str)
     rss_str = re.sub('<span>|<span .+?">|</span>', "", rss_str)
     rss_str = re.sub('<pre .+?">|</pre>', "", rss_str)
     rss_str = re.sub('<p>|<p .+?">|</p>|<b>|<b .+?">|</b>', "", rss_str)
@@ -627,6 +630,7 @@ async def handle_html_tag(html, translation: bool) -> str:
     rss_str = re.sub('<iframe .+?"/>', "", rss_str)
     rss_str = re.sub('<i .+?">|<i>|</i>', "", rss_str)
     rss_str = re.sub("<code>|</code>|<ul>|</ul>", "", rss_str)
+    rss_str = re.sub('<font .+?">|</font>', "", rss_str)
     # 解决 issue #3
     rss_str = re.sub('<dd .+?">|<dd>|</dd>', "", rss_str)
     rss_str = re.sub('<dl .+?">|<dl>|</dl>', "", rss_str)
@@ -640,10 +644,12 @@ async def handle_html_tag(html, translation: bool) -> str:
     doc_a = html("a")
     for a in doc_a.items():
         if str(a.text()) != a.attr("href"):
-            rss_str = rss_str.replace(str(a), f" {a.text()}: {a.attr('href')}\n")
+            rss_str = rss_str.replace(
+                str(a.outer_html()), f" {a.text()}: {a.attr('href')}\n"
+            )
         else:
-            rss_str = rss_str.replace(str(a), f" {a.attr('href')}\n")
-        rss_str_tl = rss_str_tl.replace(str(a), "")
+            rss_str = rss_str.replace(str(a.outer_html()), f" {a.attr('href')}\n")
+        rss_str_tl = rss_str_tl.replace(str(a.outer_html()), "")
 
     # 删除未解析成功的 a 标签
     rss_str = re.sub('<a .+?">|<a>|</a>', "", rss_str)
