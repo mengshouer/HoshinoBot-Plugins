@@ -3,7 +3,6 @@ try:
 except:
     import json
 import os
-from typing import Counter
 from nonebot import on_command, CommandSession
 from nonebot.permission import *
 from . import *
