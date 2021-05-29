@@ -7,7 +7,7 @@ class CRdata():
     custom_prefix = ""
     
     # 大小写敏感(True/False)，默认为True即敏感，对自定义回复的字母大小写敏感
-    sensitive = False
+    sensitive = True
     
     # 初始化
     try:
