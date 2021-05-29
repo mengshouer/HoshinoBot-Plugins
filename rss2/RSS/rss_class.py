@@ -32,6 +32,7 @@ class Rss:
     is_open_upload_group: bool = True  # 默认开启上传到群
     duplicate_filter_mode: [str] = None  # 去重模式
     max_image_number: int = 0  # 图片数量限制，防止消息太长刷屏
+    content_to_remove: [str] = None  # 正文待移除内容，支持正则
 
     def __init__(
         self,
@@ -52,6 +53,7 @@ class Rss:
         is_open_upload_group: bool = True,
         duplicate_filter_mode: str = None,
         max_image_number: int = 0,
+        content_to_remove: str = None,
     ):
         self.name = name
         self.url = url
@@ -79,6 +81,7 @@ class Rss:
         self.is_open_upload_group = is_open_upload_group
         self.duplicate_filter_mode = duplicate_filter_mode
         self.max_image_number = max_image_number
+        self.content_to_remove = content_to_remove
 
     # 返回订阅链接
     def get_url(self, rsshub: str = config.rsshub) -> str:
@@ -102,7 +105,7 @@ class Rss:
             rss_list_json = json.load(load_f)
             for rss_one in rss_list_json:
                 tmp_rss = Rss("", "", "-1", "-1")
-                if type(rss_one) is not str:
+                if not isinstance(rss_one, str):
                     rss_one = json.dumps(rss_one)
                 tmp_rss.__dict__ = json.loads(rss_one)
                 rss_list.append(tmp_rss)
@@ -118,10 +121,10 @@ class Rss:
 
         for tmp_new in rss_new:
             flag = True
-            for i_old in range(0, len(rss_old)):
+            for index, i_old in enumerate(rss_old):
                 # 如果有记录 就修改记录,没有就添加
-                if rss_old[i_old].name == tmp_new.name:
-                    rss_old[i_old] = tmp_new
+                if i_old.name == tmp_new.name:
+                    rss_old[index] = tmp_new
                     flag = False
                     break
             if flag:
@@ -150,14 +153,6 @@ class Rss:
                 return feed
         return None
 
-    # 查找是否存在当前订阅链接
-    def find_url(self, url: str):
-        url_list = self.read_rss()
-        for tmp in url_list:
-            if tmp.url == url:
-                return tmp
-        return None
-
     # 添加订阅 QQ
     def add_user(self, user: str):
         if str(user) in self.user_id:
@@ -171,14 +166,6 @@ class Rss:
             return
         self.group_id.append(str(group))
         self.write_rss()
-
-    # 删除订阅 QQ
-    def delete_user(self, user: str) -> bool:
-        if not str(user) in self.user_id:
-            return False
-        self.user_id.remove(str(user))
-        self.write_rss()
-        return True
 
     # 删除订阅 群组
     def delete_group(self, group: str) -> bool:
@@ -286,5 +273,6 @@ class Rss:
             f"是否上传到群：{self.is_open_upload_group}\n"
             f"去重模式：{self.duplicate_filter_mode}{mode_msg}\n"
             f"图片数量限制：{self.max_image_number}\n"
+            f"正文待移除内容：{self.content_to_remove}\n"
         )
         return ret

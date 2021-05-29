@@ -17,6 +17,7 @@ test qq=,123,234 qun=-1
 下载种子-downopen 白名单关键词-wkey 黑名单关键词-bkey 种子上传到群-upgroup
 去重模式-mode
 图片数量限制-img_num 最多一条消息只会发送指定数量的图片，防止刷屏
+正文待移除内容-rm_list 从正文中要移除的指定内容，支持正则
 注：
 仅含有图片不同于仅图片，除了图片还会发送正文中的其他文本信息
 proxy、tl、ot、op、ohp、downopen、upgroup 值为 1/0
@@ -25,9 +26,12 @@ proxy、tl、ot、op、ohp、downopen、upgroup 值为 1/0
 此外,如果属性中带有 or 说明判断逻辑是任一匹配即去重,默认为全匹配    
 白名单关键词支持正则表达式，匹配时推送消息及下载，设为空(wkey=)时不生效
 黑名单关键词同白名单一样，只是匹配时不推送，两者可以一起用
+正文待移除内容因为参数解析的缘故，格式必须如：rm_list='a' 或 rm_list='a','b'
+该处理过程是在解析 html 标签后进行的
+要将该参数设为空使用 rm_list='-1'
 QQ、群号、去重模式前加英文逗号表示追加,-1设为空
 各个属性空格分割
-详细：https://oy.mk/ckL'''.strip()
+详细：http://oy.mk/cUm'''.strip()
 
 # 处理带多个值的订阅参数
 def handle_property(value: str, property_list: list) -> list:
@@ -99,8 +103,15 @@ async def change(session: CommandSession):
         group_id = session.ctx['group_id']
     except:
         group_id = None
+    # 参数特殊处理：正文待移除内容
+    rm_list_exist = re.search(" rm_list='.+'", change_info)
+    rm_list = None
+    if rm_list_exist:
+        rm_list_str = rm_list_exist[0].lstrip().replace("rm_list=", "")
+        rm_list = [i.strip("'") for i in rm_list_str.split("','")]
+        change_info = change_info.replace(rm_list_exist[0], "")
     change_list = change_info.split(' ')
-
+    
     name = change_list[0]
     change_list.pop(0)
     rss = rss_class.Rss(name, "", "-1", "-1")
@@ -129,6 +140,11 @@ async def change(session: CommandSession):
             else:
                 await RSS_CHANGE.send(f'❌ 参数错误或无权修改！\n{change_dict}')
                 return
+        if rm_list:
+            if len(rm_list) == 1 and rm_list[0] == "-1":
+                setattr(rss, "content_to_remove", None)
+            else:
+                setattr(rss, "content_to_remove", rm_list)
         # 参数解析完毕，写入
         rss.write_rss()
         # 加入定时任务
