@@ -15,12 +15,13 @@ import tenacity
 import unicodedata
 from io import BytesIO
 from pathlib import Path
-import hashlib
+
 import emoji
 import feedparser
 import httpx
 import nonebot
 from google_trans_new import google_translator
+import hashlib
 from nonebot.log import logger
 from PIL import Image, UnidentifiedImageError
 from pyquery import PyQuery as Pq
@@ -642,11 +643,27 @@ async def handle_html_tag(html, translation: bool) -> str:
     # 有序/无序列表 标签处理
     for ul in html("ul").items():
         for li in ul("li").items():
-            rss_str = rss_str.replace(li.outer_html(), f"- {li.text()}")
+            li_str_search = re.search("<li>(.+)</li>", repr(str(li)))
+            rss_str = rss_str.replace(str(li), f"\n- {li_str_search.group(1)}")
     for ol in html("ol").items():
         for index, li in enumerate(ol("li").items()):
-            rss_str = rss_str.replace(li.outer_html(), f"{index + 1}. {li.text()}")
+            li_str_search = re.search("<li>(.+)</li>", repr(str(li)))
+            rss_str = rss_str.replace(
+                str(li), f"\n{index + 1}. {li_str_search.group(1)}"
+            )
     rss_str = re.sub("</?(ul|ol)>", "", rss_str)
+
+    # 翻译用副本
+    rss_str_tl = rss_str
+
+    # <a> 标签处理
+    for a in html("a").items():
+        a_str = re.search(r"<a.+?</a>", str(a))[0]
+        if str(a.text()) != a.attr("href"):
+            rss_str = rss_str.replace(a_str, f" {a.text()}: {a.attr('href')}\n")
+        else:
+            rss_str = rss_str.replace(a_str, f" {a.attr('href')}\n")
+        rss_str_tl = rss_str_tl.replace(a_str, "")
 
     # 处理一些 HTML 标签
     rss_str = re.sub('<br .+?"/>|<(br|hr) ?/?>', "\n", rss_str)
@@ -658,7 +675,7 @@ async def handle_html_tag(html, translation: bool) -> str:
     rss_str = re.sub("</?(code|strong)>", "", rss_str)
     rss_str = re.sub('<font .+?">|</font>', "", rss_str)
     rss_str = re.sub("</?(table|tr|th|td)>", "", rss_str)
-    rss_str = re.sub(r"</?h\d>", "", rss_str)
+    rss_str = re.sub(r"</?h\d>", "\n", rss_str)
 
     # 解决 issue #3
     rss_str = re.sub('<dd .+?">|</?dd>', "", rss_str)
@@ -667,19 +684,6 @@ async def handle_html_tag(html, translation: bool) -> str:
 
     # 删除图片、视频标签
     rss_str = re.sub(r'<video .+?"?/>|</video>|<img.+?>', "", rss_str)
-
-    # 翻译用副本
-    rss_str_tl = rss_str
-
-    # <a> 标签处理
-    for a in html("a").items():
-        if str(a.text()) != a.attr("href"):
-            rss_str = rss_str.replace(
-                a.outer_html(), f" {a.text()}: {a.attr('href')}\n"
-            )
-        else:
-            rss_str = rss_str.replace(a.outer_html(), f" {a.attr('href')}\n")
-        rss_str_tl = rss_str_tl.replace(a.outer_html(), "")
 
     # 去掉换行
     while re.search("\n\n", rss_str) or re.search("\n\n", rss_str_tl):
