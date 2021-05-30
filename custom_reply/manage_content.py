@@ -3,6 +3,7 @@ try:
 except:
     import json
 import os
+from typing import Counter
 from nonebot import on_command, CommandSession
 from nonebot.permission import *
 from . import *
@@ -43,6 +44,15 @@ async def del_custom_reply_content(session: CommandSession):
         with open('CustomReplyData.json', 'w', encoding="GB2312") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
             await session.send(f'自定义回复"{content}"删除成功！')
+        if os.path.exists("HideCustomReplyList.json"):
+            try:
+                with open('HideCustomReplyList.json', 'r', encoding="GB2312") as f:
+                    data = json.load(f)
+                del data[content]
+                with open('HideCustomReplyList.json', 'w', encoding="GB2312") as f:
+                    json.dump(data, f, indent=4, ensure_ascii=False)
+            except Exception as e:
+                pass
     except Exception as e:
         print(repr(e))
         await session.finish(f'不存在该自定义回复"{content}"')
