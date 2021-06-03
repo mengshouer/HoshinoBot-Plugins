@@ -19,4 +19,4 @@ magneturi
 ImageHash
 pydantic
 tenacity
-
+bbcode
