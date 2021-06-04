@@ -8,10 +8,10 @@ from nonebot.log import logger
 class CRdata():
     # 仅回复带有自定义前缀的信息(能减少占用,为空默认关闭)
     # 例：custom_prefix = "/!" 这里就是匹配/和!开头的自定义回复，不用分隔开
-    custom_prefix = "/水自"
+    custom_prefix = ""
     
     # 大小写敏感(True/False)，默认为True即敏感，对自定义回复的字母大小写敏感
-    sensitive = False
+    sensitive = True
     
     
     # 初始化
