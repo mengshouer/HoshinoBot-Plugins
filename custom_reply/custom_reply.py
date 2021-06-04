@@ -1,4 +1,5 @@
-import nonebot,os
+import nonebot
+import os
 try:
     import ujson as json
 except:
