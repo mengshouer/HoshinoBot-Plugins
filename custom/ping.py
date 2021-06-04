@@ -6,4 +6,4 @@ async def ping(session: CommandSession):
     time_from_receive = session.event['time']
     if time_from_receive > 3000000000:
         time_from_receive = time_from_receive / 1000
-    session.finish("->"+str(time.time() - time_from_receive)+"s", at_sender=True)
+    await session.finish("->"+str(time.time() - time_from_receive)+"s", at_sender=True)
