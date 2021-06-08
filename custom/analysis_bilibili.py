@@ -14,7 +14,7 @@ async def rex_bilibili(bot, ev):
     if "b23.tv" in text:
         # 提前处理短链接，避免解析到其他的
         text = await b23_extract(text)
-    patterns = r'(www.bilibili.com/video)|(www.bilibili.com/bangumi)|(^(BV|bv)([0-9A-Za-z]{10}))|(^(av|AV)([0-9]+)(/.*|\\?.*|)$)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)'
+    patterns = r'(bilibili.com/video)|(bilibili.com/bangumi)|(^(BV|bv)([0-9A-Za-z]{10}))|(^(av|AV)([0-9]+)(/.*|\\?.*|)$)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)'
     match = re.compile(patterns).search(text)
     if match:
         group_id = ev.group_id
