@@ -273,7 +273,10 @@ async def duplicate_exists(
             content = await download_image(url, rss.img_proxy)
             if not content:
                 continue
-            im = Image.open(BytesIO(content))
+            try:
+                im = Image.open(BytesIO(content))
+            except UnidentifiedImageError:
+                continue
             image_hash = imagehash.average_hash(im)
             # GIF 图片的 image_hash 实际上是第一帧的值，为了避免误伤直接跳过
             if im.format == "GIF":
@@ -309,7 +312,7 @@ def write_item(rss: rss_class.Rss, new_rss: dict, new_item: str):
 async def handle_down_torrent(rss: rss_class, item: dict) -> list:
     if not rss.is_open_upload_group:
         rss.group_id = []
-    if config.is_open_auto_down_torrent and rss.down_torrent:
+    if rss.down_torrent:
         return await down_torrent(rss=rss, item=item, proxy=get_proxy(rss.img_proxy))
 
 
@@ -589,10 +592,12 @@ async def download_image_detail(url: str, proxy: bool):
             except httpx.ConnectError as e:
                 logger.error(f"图片[{url}]下载失败,有可能需要开启代理！ \n{e}")
                 return None
-            # 如果图片无法访问到,直接返回
-            if pic.status_code not in STATUS_CODE or len(pic.content) == 0:
+            # 如果 图片无法获取到 / 获取到的不是图片，直接返回
+            if ("image" not in pic.headers["Content-Type"]) or (
+                pic.status_code not in STATUS_CODE
+            ):
                 logger.error(
-                    f"[{url}] pic.status_code: {pic.status_code} pic.size: {len(pic.content)}"
+                    f"[{url}] Content-Type: {pic.headers['Content-Type']} status_code: {pic.status_code}"
                 )
                 return None
             return pic.content
@@ -601,9 +606,21 @@ async def download_image_detail(url: str, proxy: bool):
         raise
 
 
-async def download_image(url: str, proxy: bool = False):
+# 图片地址预处理
+async def handle_img_url(url: str) -> str:
     if re.search(r"^//", url):
         url = url.replace("//", "https://")
+    # 如果是推特图片，重定向为原图
+    if "pbs.twimg.com" in url:
+        url = url.replace("?format=", ".").replace("&name=", ":")
+        url = re.sub(":(thumb|small|medium|large)", "", url)
+        if ":orig" not in url:
+            url += ":orig"
+    return url
+
+
+async def download_image(url: str, proxy: bool = False):
+    url = await handle_img_url(url)
     try:
         return await download_image_detail(url=url, proxy=proxy)
     except Exception as e:
@@ -612,8 +629,7 @@ async def download_image(url: str, proxy: bool = False):
 
 
 async def handle_img_combo(url: str, img_proxy: bool) -> str:
-    if re.search(r"^//", url):
-        url = url.replace("//", "https://")
+    url = await handle_img_url(url)
     content = await download_image(url, img_proxy)
     resize_content = await zip_pic(url, img_proxy, content)
     img_base64 = await get_pic_base64(resize_content)
@@ -728,6 +744,7 @@ async def handle_html_tag(html) -> str:
         "font",
         "iframe",
         "pre",
+        "small",
         "span",
         "strong",
         "sub",
@@ -811,7 +828,8 @@ def dict_hash(dictionary: Dict[str, Any]) -> str:
     if dictionary.get("published_parsed"):
         dictionary_temp.pop("published_parsed")
     # 某些情况下，如微博带视频的消息，正文可能不一样，先过滤
-    dictionary_temp.pop("summary")
+    if dictionary.get("summary"):
+        dictionary_temp.pop("summary")
     if dictionary.get("summary_detail"):
         dictionary_temp.pop("summary_detail")
     d_hash = hashlib.md5()
