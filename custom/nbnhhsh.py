@@ -1,7 +1,10 @@
-import requests
+import httpx
 from nonebot import on_command, CommandSession
+from hoshino import Service
 
-@on_command('sx', aliases=('缩写', 'zy', '转义', 'nhnhhsh', '/sx', '\sx'), only_to_me=False)
+sv = Service('nbnhhsh')
+
+@sv.on_command('sx', aliases=('缩写', 'zy', '转义', 'nhnhhsh', '/sx', '\sx'), only_to_me=False)
 async def nbnhhsh(session: CommandSession):
     episode = session.current_arg_text.strip()
     if not episode:
@@ -12,7 +15,8 @@ async def nbnhhsh(session: CommandSession):
             data = {
                 "text" : episode
             }
-            r = requests.post(url,data=data,timeout=5)
+            with httpx.Client(proxies={}) as client:
+                r = client.post(url, data=data, timeout=5)
             data = r.json()[0]["trans"]
             msg = "可能拼音缩写的是："+str(data)
             await session.send(msg, at_sender=True)
