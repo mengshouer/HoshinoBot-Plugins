@@ -1,3 +1,5 @@
+import copy
+
 from nonebot import on_command, CommandSession
 from nonebot.permission import *
 
@@ -25,14 +27,17 @@ async def rssShow(session: CommandSession):
         if not rss:
             await session.send("❌ 订阅 {} 不存在！".format(rss_name))
             return
+        rss_msg = str(rss)
         if group_id:
             # 隐私考虑，群组下不展示除当前群组外的群号和QQ
             if not str(group_id) in rss.group_id:
                 await session.send("❌ 当前群组未订阅 {} ".format(rss_name))
                 return
-            rss.group_id = [str(group_id), "*"]
-            rss.user_id = ["*"]
-        await session.send(str(rss))
+            rss_tmp = copy.deepcopy(rss)
+            rss_tmp.group_id = [str(group_id), "*"]
+            rss_tmp.user_id = ["*"]
+        rss_msg = str(rss_tmp)
+        await session.send(str(rss_msg))
         return
 
     if group_id:

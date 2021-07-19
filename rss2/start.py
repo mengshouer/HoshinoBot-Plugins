@@ -36,7 +36,7 @@ async def start():
             if not rss_tmp.stop:
                 await tr.add_job(rss_tmp)  # 创建检查更新任务
         logger.info('ELF_RSS 订阅器启动成功！')
-        hash_clear()
+        # hash_clear()
     except Exception as e:
         logger.info('第一次启动，你还没有订阅，记得添加哟！')
         logger.debug(e)

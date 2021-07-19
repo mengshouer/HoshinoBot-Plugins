@@ -13,7 +13,6 @@ import re
 import sqlite3
 import time
 import imagehash
-import tenacity
 import unicodedata
 from io import BytesIO
 from pathlib import Path
@@ -28,7 +27,7 @@ from google_trans_new import google_translator
 from nonebot.log import logger
 from PIL import Image, UnidentifiedImageError
 from pyquery import PyQuery as Pq
-from tenacity import retry, stop_after_attempt, stop_after_delay
+from tenacity import retry, stop_after_attempt, stop_after_delay, RetryError, TryAgain
 
 from ..config import config
 from . import rss_class
@@ -76,14 +75,9 @@ async def start(rss: rss_class.Rss) -> None:
     try:
         new_rss = await get_rss(rss)
         new_rss_list = new_rss.get("entries")
-    except tenacity.RetryError as e:
-        if rss.cookies:
-            cookies_str = "\n如果设置了 cookies 请检查 cookies 正确性"
-        else:
-            cookies_str = ""
-        logger.error(
-            f"{rss.name}[{rss.get_url()}]抓取失败！已达最大重试次数！请检查订阅地址！{cookies_str}\nE: {e}"
-        )
+    except RetryError:
+        cookies_str = "及 cookies " if rss.cookies else ""
+        logger.error(f"{rss.name}[{rss.get_url()}]抓取失败！已达最大重试次数！请检查订阅地址{cookies_str}！")
         return
     old_rss = read_rss(rss.name)
     old_rss_list = old_rss.get("entries")
@@ -101,6 +95,7 @@ async def start(rss: rss_class.Rss) -> None:
     conn = None
     if rss.duplicate_filter_mode:
         conn = sqlite3.connect(FILE_PATH + "cache.db")
+        conn.set_trace_callback(logger.debug)
         await cache_db_manage(conn)
     item_count = 0
     for item in change_rss_list:
@@ -220,7 +215,8 @@ async def insert_into_cache_db(
     link = item["link"].replace("'", "''")
     title = item["title"].replace("'", "''")
     cursor.execute(
-        f"INSERT INTO main (link, title, image_hash) VALUES ('{link}', '{title}', '{image_hash}');"
+        "INSERT INTO main (link, title, image_hash) VALUES (?, ?, ?);",
+        (link, title, image_hash),
     )
     cursor.close()
     conn.commit()
@@ -246,7 +242,8 @@ async def cache_db_manage(conn: sqlite3.connect) -> None:
     cursor = conn.cursor()
     # 移除超过 config.db_cache_expire 天没重复过的记录
     cursor.execute(
-        f"DELETE FROM main WHERE datetime <= DATETIME('Now', 'LocalTime', '-{config.db_cache_expire} Day');"
+        "DELETE FROM main WHERE datetime <= DATETIME('Now', 'LocalTime', ?);",
+        (f"-{config.db_cache_expire} Day",),
     )
     cursor.close()
     conn.commit()
@@ -262,6 +259,7 @@ async def duplicate_exists(
     image_hash = None
     cursor = conn.cursor()
     sql = "SELECT * FROM main WHERE 1=1"
+    args = []
     for mode in rss.duplicate_filter_mode:
         if mode == "image":
             try:
@@ -283,24 +281,28 @@ async def duplicate_exists(
                 im = Image.open(BytesIO(content))
             except UnidentifiedImageError:
                 continue
-            image_hash = imagehash.average_hash(im)
+            image_hash = str(imagehash.average_hash(im))
             # GIF 图片的 image_hash 实际上是第一帧的值，为了避免误伤直接跳过
             if im.format == "GIF":
                 continue
             logger.debug(f"image_hash: {image_hash}")
-            sql += f" AND image_hash='{image_hash}'"
+            sql += " AND image_hash=?"
+            args.append(image_hash)
         if mode == "link":
-            sql += f" AND link='{link}'"
+            sql += " AND link=?"
+            args.append(link)
         if mode == "title":
-            sql += f" AND title='{title}'"
+            sql += " AND title=?"
+            args.append(title)
     if "or" in rss.duplicate_filter_mode:
         sql = sql.replace("AND", "OR").replace("OR", "AND", 1)
-    cursor.execute(f"{sql};")
+    cursor.execute(f"{sql};", args)
     result = cursor.fetchone()
     if result is not None:
         result_id = result[0]
         cursor.execute(
-            f"UPDATE main SET datetime = DATETIME('Now','LocalTime') WHERE id = {result_id};"
+            "UPDATE main SET datetime = DATETIME('Now','LocalTime') WHERE id = ?;",
+            (result_id,),
         )
         cursor.close()
         conn.commit()
@@ -345,10 +347,7 @@ async def down_torrent(rss: rss_class, item: dict, proxy=None) -> list:
 @retry(stop=(stop_after_attempt(5) | stop_after_delay(30)))
 async def get_rss(rss: rss_class.Rss) -> dict:
     # 判断是否使用cookies
-    if rss.cookies:
-        cookies = rss.cookies
-    else:
-        cookies = None
+    cookies = rss.cookies if rss.cookies else None
 
     # 获取 xml
     async with httpx.AsyncClient(
@@ -358,38 +357,37 @@ async def get_rss(rss: rss_class.Rss) -> dict:
         try:
             r = await client.get(rss.get_url())
             # 解析为 JSON
-            d = feedparser.parse(r.content)
+            if r.status_code in STATUS_CODE:
+                d = feedparser.parse(r.content)
+            else:
+                raise httpx.HTTPStatusError
         except Exception:
-            # logger.error("抓取订阅 {} 的 RSS 失败，将重试 ！ E：{}".format(rss.name, e))
             if (
                 not re.match("[hH][tT]{2}[pP][sS]?://", rss.url, flags=0)
                 and config.rsshub_backup
             ):
-                logger.warning("RSSHub :" + config.rsshub + " 访问失败 ！将使用备用RSSHub 地址！")
+                logger.warning(f"RSSHub：[{config.rsshub}]访问失败！将使用备用 RSSHub 地址！")
                 for rsshub_url in list(config.rsshub_backup):
                     async with httpx.AsyncClient(
                         proxies=get_proxy(open_proxy=rss.img_proxy)
                     ) as fork_client:
                         try:
                             r = await fork_client.get(rss.get_url(rsshub=rsshub_url))
+                            if r.status_code in STATUS_CODE:
+                                d = feedparser.parse(r.content)
+                            else:
+                                raise httpx.HTTPStatusError
                         except Exception:
                             logger.warning(
-                                "RSSHub :"
-                                + rss.get_url(rsshub=rsshub_url)
-                                + " 访问失败 ！将使用备用 RSSHub 地址！"
+                                f"[{rss.get_url(rsshub=rsshub_url)}]访问失败！将使用备用 RSSHub 地址！"
                             )
                             continue
-                        if r.status_code in STATUS_CODE:
-                            d = feedparser.parse(r.content)
-                            if d.get("entries"):
-                                logger.info(rss.get_url(rsshub=rsshub_url) + " 抓取成功！")
-                                break
-        try:
-            if not d:
-                raise Exception
-        except Exception:
+                        if d.get("entries"):
+                            logger.info(f"[{rss.get_url(rsshub=rsshub_url)}]抓取成功！")
+                            break
+        if not d.get("entries"):
             logger.warning(f"{rss.name} 抓取失败！将重试最多 5 次！")
-            raise
+            raise TryAgain
         return d
 
 
@@ -731,7 +729,10 @@ async def handle_html_tag(html) -> str:
     for a in new_html("a").items():
         a_str = re.search(r"<a.+?</a>", html_unescape(str(a)), flags=re.DOTALL)[0]
         if a.text() and str(a.text()) != a.attr("href"):
-            rss_str = rss_str.replace(a_str, f" {a.text()}: {a.attr('href')}\n")
+            if (a.text().startswith("#") and a.text().endswith("#") and "weibo.cn" in a.attr("href")):
+                rss_str = rss_str.replace(a_str, f" {a.text()}")
+            else:
+                rss_str = rss_str.replace(a_str, f" {a.text()}: {a.attr('href')}\n")
         else:
             rss_str = rss_str.replace(a_str, f" {a.attr('href')}\n")
 
@@ -746,6 +747,7 @@ async def handle_html_tag(html) -> str:
         "dd",
         "dl",
         "dt",
+        "em",
         "font",
         "iframe",
         "pre",
@@ -897,27 +899,26 @@ def write_rss(name: str, new_rss: dict, new_item: list = None):
 # 发送消息
 async def send_msg(rss: rss_class.Rss, msg: str, item: dict) -> bool:
     bot = nonebot.get_bot()
-    try:
-        if len(msg) <= 0:
-            return False
-        if rss.user_id:
-            for user_id in rss.user_id:
-                try:
-                    await bot.send_msg(
-                        message_type="private", user_id=user_id, message=str(msg)
-                    )
-                except Exception as e:
-                    logger.error(f'发送QQ号[{user_id}]错误！ E: {e}')
-
-        if rss.group_id:
-            for group_id in rss.group_id:
-                try:
-                    await bot.send_msg(
-                        message_type="group", group_id=group_id, message=str(msg)
-                    )
-                except Exception as e:
-                    logger.info(f'发送群号[{group_id}]错误！ E: {e}')
-        return True
-    except Exception as e:
-        logger.info(f"发生错误 消息发送失败 E: {e}")
+    flag = False
+    if not msg:
         return False
+    if rss.user_id:
+        for user_id in rss.user_id:
+            try:
+                await bot.send_msg(
+                    message_type="private", user_id=user_id, message=str(msg)
+                )
+                flag = True
+            except Exception as e:
+                logger.error(f'发送QQ号[{user_id}]错误！ E: {e}')
+
+    if rss.group_id:
+        for group_id in rss.group_id:
+            try:
+                await bot.send_msg(
+                    message_type="group", group_id=group_id, message=str(msg)
+                )
+                flag = True
+            except Exception as e:
+                logger.error(f'发送QQ号[{user_id}]错误！ E: {e}')
+    return flag

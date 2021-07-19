@@ -182,15 +182,20 @@ async def check_down_status(hash_str: str, group_ids: list, name: str):
                     else:
                         path = info["save_path"] + tmp["name"]
                     await send_msg(f"{name}\nHash: {hash_str} \n开始上传到群：{group_id}")
-                    await bot.call_action(
-                       action="upload_group_file",
-                        group_id=group_id,
-                        file=path,
-                        name=tmp["name"],
-                    )
+                    try:
+                        await bot.call_action(
+                        action="upload_group_file",
+                            group_id=group_id,
+                            file=path,
+                            name=tmp["name"],
+                        )
+                    except Exception as e:
+                        await send_msg(
+                            f"{name}\nHash: {hash_str} \n上传到群：{group_id}失败！请手动上传！"
+                        )
+                        logger.error(e)
                 except TimeoutError as e:
                     logger.warning(e)
-                    continue
         scheduler.remove_job(hash_str)
         down_info[hash_str]["status"] = DOWN_STATUS_UPLOAD_OK
     else:
@@ -211,7 +216,7 @@ async def delete_msg(msg_ids: list):
         try:
             await bot.call_action("delete_msg", message_id=msg_id["message_id"])
         except Exception as e:
-            logger.warning("下载进度消息撤回失败！")
+            logger.warning("下载进度消息撤回失败！", e)
 
 
 async def rss_trigger(hash_str: str, group_ids: list, name: str):
