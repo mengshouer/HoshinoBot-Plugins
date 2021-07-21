@@ -17,8 +17,13 @@ async def nbnhhsh(session: CommandSession):
             }
             with httpx.Client(proxies={}) as client:
                 r = client.post(url, data=data, timeout=5)
-            data = r.json()[0]["trans"]
+            try:
+                data = r.json()[0]["trans"]
+            except:
+                await session.send("未查询到转义，可前往https://lab.magiconch.com/nbnhhsh/ 查询/贡献词条", at_sender=True)
+                return
             msg = "可能拼音缩写的是："+str(data)
             await session.send(msg, at_sender=True)
-        except:
-            await session.send("未查询到转义，可前往https://lab.magiconch.com/nbnhhsh/ 查询/贡献词条", at_sender=True)
+        except Exception as e:
+            msg = "Error: {}".format(type(e))
+            await session.send(msg)
