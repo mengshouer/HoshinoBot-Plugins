@@ -56,6 +56,8 @@ async def bili_keyword(group_id, text):
             vurl = url
         elif "live.bilibili.com" in url:
             msg,vurl = await live_detail(url)
+        elif "article" in url:
+            msg,vurl = await article_detail(url)
         else:
             msg,vurl = await video_detail(url)
         
@@ -88,6 +90,7 @@ async def extract(text:str):
         epid = re.compile(r'ep\d+').search(text)
         ssid = re.compile(r'ss\d+').search(text)
         room_id = re.compile(r"live.bilibili.com/(\d+)").search(text)
+        cvid = re.compile(r'(cv|CV)\d+').search(text)
         if bvid:
             url = f'https://api.bilibili.com/x/web-interface/view?bvid={bvid[0]}'
         elif aid:
@@ -98,6 +101,8 @@ async def extract(text:str):
             url = f'https://www.bilibili.com/bangumi/play/{ssid[0]}'
         elif room_id:
             url = f'https://api.live.bilibili.com/xlive/web-room/v1/index/getInfoByRoom?room_id={room_id.group(1)}'
+        elif cvid:
+            url = f"https://api.bilibili.com/x/article/viewinfo?id={cvid[0][2:]}&mobi_app=pc&from=web"
         return url
     except:
         return None
@@ -186,3 +191,24 @@ async def live_detail(url):
         msg = "直播间解析出错--Error: {}".format(type(e))
         return msg, None
 
+async def article_detail(url):
+    try:
+        async with aiohttp.request('GET', url, timeout=aiohttp.client.ClientTimeout(10)) as resp:
+            res = await resp.json()
+            res = res['data']
+        cvid = re.compile(r'id=(\d+)').search(url).group(1)
+        vurl = f"URL：https://www.bilibili.com/read/cv{cvid}\n"
+        title = f"标题：{res['title']}\n"
+        up = f"作者：{res['author_name']} (https://space.bilibili.com/{res['mid']})\n"
+        view = f"阅读数：{res['stats']['view']} "
+        favorite = f"收藏数：{res['stats']['favorite']} "
+        coin = f"硬币数：{res['stats']['coin']}"
+        share = f"分享数：{res['stats']['share']} "
+        like = f"点赞数：{res['stats']['like']} "
+        dislike = f"不喜欢数：{res['stats']['dislike']}"
+        desc = view + favorite + coin + '\n' + share + like + dislike
+        msg = str(vurl)+str(title)+str(up)+str(desc)
+        return msg, vurl
+    except Exception as e:
+        msg = "专栏解析出错--Error: {}".format(type(e))
+        return msg, None
