@@ -1,5 +1,6 @@
 google_trans_new
 httpx
+datetime
 emoji
 nonebot
 requests
