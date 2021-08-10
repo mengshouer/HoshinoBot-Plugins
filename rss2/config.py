@@ -31,10 +31,6 @@ class config:
     #可选，百度翻译接口secretKey，http://api.fanyi.baidu.com/获取
     baidukey: str = ''
 
-    # 解决pixiv.cat无法访问问题
-    #是否关闭使用 pixiv.cat，关闭后必须启用代理
-    close_pixiv_cat: bool = False
-
     # 是否打开自动下载种子
     is_open_auto_down_torrent: bool = False
     #qbittorrent 客户端默认是关闭状态，请打开并设置端口号为 8081，同时勾选 “对本地主机上的客户端跳过身份验证”

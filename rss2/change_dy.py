@@ -171,7 +171,7 @@ async def change(session: CommandSession):
             rss_tmp = copy.deepcopy(rss)
             rss_tmp.group_id = [str(group_id), "*"]
             rss_tmp.user_id = ["*"]
-        rss_msg = str(rss_tmp)
+            rss_msg = str(rss_tmp)
         await session.send(f"👏 修改成功\n{rss_msg}")
         logger.info(f"👏 修改成功\n{rss_msg}")
 
