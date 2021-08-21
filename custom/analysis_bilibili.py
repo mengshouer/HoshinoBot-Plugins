@@ -89,6 +89,7 @@ async def extract(text:str):
         mdid = re.compile(r'md\d+').search(text)
         room_id = re.compile(r"live.bilibili.com/(blanc/|h5/)?(\d+)").search(text)
         cvid = re.compile(r'(cv|CV)\d+').search(text)
+        mcvid = re.compile(r'(read/mobile/)\d+').search(text)
         if bvid:
             url = f'https://api.bilibili.com/x/web-interface/view?bvid={bvid[0]}'
         elif aid:
@@ -103,6 +104,8 @@ async def extract(text:str):
             url = f'https://api.live.bilibili.com/xlive/web-room/v1/index/getInfoByRoom?room_id={room_id[2]}'
         elif cvid:
             url = f"https://api.bilibili.com/x/article/viewinfo?id={cvid[0][2:]}&mobi_app=pc&from=web"
+        elif mcvid:
+            url = f"https://api.bilibili.com/x/article/viewinfo?id={mcvid[0][12:]}&mobi_app=pc&from=web"
         return url
     except:
         return None
@@ -206,8 +209,6 @@ async def live_detail(url):
         up = f"主播：{uname} 当前分区：{parent_area_name}-{area_name} 人气上一次刷新值：{online}\n"
         if tags:
             tags = f"标签：{tags}\n"
-        else:
-            tags = ""
         player = f"独立播放器：https://www.bilibili.com/blackboard/live/live-activity-player.html?enterTheRoom=0&cid={room_id}"
         msg = str(vurl)+str(title)+str(up)+str(tags)+str(player)
         return msg, vurl
