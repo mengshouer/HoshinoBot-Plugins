@@ -15,11 +15,11 @@ analysis_stat = {}   # analysis_stat: video_url(vurl)
 @sv.on_message('group')
 async def rex_bilibili(bot, ev):
     text = escape(str(ev.message).strip())
-    if re.search(r"(b23.tv)|(bili(22|23|33|2233).cn)", text):
+    if re.search(r"(b23.tv)|(bili(22|23|33|2233).cn)", text, re.I):
         # 提前处理短链接，避免解析到其他的
         text = await b23_extract(text)
-    patterns = r"(live.bilibili.com)|(bilibili.com/(video|read|bangumi))|(^(av|AV|CV|cv)(\d+))|(^(BV|bv)([0-9A-Za-z]{10}))|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)|(QQ小程序&#93;哔哩哔哩)"
-    match = re.compile(patterns).search(text)
+    patterns = r"(live.bilibili.com)|(bilibili.com/(video|read|bangumi))|(^(av|cv)(\d+))|(^BV([a-zA-Z0-9])+)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)|(QQ小程序&#93;哔哩哔哩)"
+    match = re.compile(patterns, re.I).search(text)
     if match:
         group_id = ev.group_id
         msg = await bili_keyword(group_id, text)
@@ -74,7 +74,7 @@ async def bili_keyword(group_id, text):
     return msg
 
 async def b23_extract(text):
-    b23 = re.compile(r'b23.tv/(\w+)|(bili(22|23|33|2233).cn)/(\w+)').search(text.replace("\\",""))
+    b23 = re.compile(r'b23.tv/(\w+)|(bili(22|23|33|2233).cn)/(\w+)', re.I).search(text.replace("\\",""))
     url = f'https://{b23[0]}'
     async with aiohttp.request('GET', url, timeout=aiohttp.client.ClientTimeout(10)) as resp:
         r = str(resp.url)
@@ -82,14 +82,13 @@ async def b23_extract(text):
 
 async def extract(text:str):
     try:
-        aid = re.compile(r'(av|AV)\d+').search(text)
-        bvid = re.compile(r'(BV|bv)([a-zA-Z0-9])+').search(text)
-        epid = re.compile(r'ep\d+').search(text)
-        ssid = re.compile(r'ss\d+').search(text)
-        mdid = re.compile(r'md\d+').search(text)
-        room_id = re.compile(r"live.bilibili.com/(blanc/|h5/)?(\d+)").search(text)
-        cvid = re.compile(r'(cv|CV)\d+').search(text)
-        mcvid = re.compile(r'(read/mobile/)\d+').search(text)
+        aid = re.compile(r'av\d+', re.I).search(text)
+        bvid = re.compile(r'BV([a-zA-Z0-9])+', re.I).search(text)
+        epid = re.compile(r'ep\d+', re.I).search(text)
+        ssid = re.compile(r'ss\d+', re.I).search(text)
+        mdid = re.compile(r'md\d+', re.I).search(text)
+        room_id = re.compile(r"live.bilibili.com/(blanc/|h5/)?(\d+)", re.I).search(text)
+        cvid = re.compile(r'(cv|/read/(mobile|native)(/|\?id=))(\d+)', re.I).search(text)
         if bvid:
             url = f'https://api.bilibili.com/x/web-interface/view?bvid={bvid[0]}'
         elif aid:
@@ -103,9 +102,7 @@ async def extract(text:str):
         elif room_id:
             url = f'https://api.live.bilibili.com/xlive/web-room/v1/index/getInfoByRoom?room_id={room_id[2]}'
         elif cvid:
-            url = f"https://api.bilibili.com/x/article/viewinfo?id={cvid[0][2:]}&mobi_app=pc&from=web"
-        elif mcvid:
-            url = f"https://api.bilibili.com/x/article/viewinfo?id={mcvid[0][12:]}&mobi_app=pc&from=web"
+            url = f"https://api.bilibili.com/x/article/viewinfo?id={cvid[4]}&mobi_app=pc&from=web"
         return url
     except:
         return None
