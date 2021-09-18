@@ -1,14 +1,35 @@
-import sqlite3
 import imagehash
+import sqlite3
 
 from PIL import Image, UnidentifiedImageError
 from io import BytesIO
 from nonebot.log import logger
 from pyquery import PyQuery as Pq
+from tinydb import TinyDB
 
 from .handle_images import download_image
 from ... import rss_class
 from ....config import config
+
+
+# 精简 xxx.json (缓存) 中的字段
+def cache_filter(data: dict) -> dict:
+    keys = [
+        "id",
+        "link",
+        "published",
+        "updated",
+        "title",
+        "hash",
+    ]
+    if data.get("to_send"):
+        keys += [
+            "content",
+            "summary",
+            "to_send",
+            "count",
+        ]
+    return {k: data[k] for k in keys if k in data}
 
 
 # 对去重数据库进行管理
@@ -36,6 +57,14 @@ async def cache_db_manage(conn: sqlite3.connect) -> None:
     )
     cursor.close()
     conn.commit()
+
+
+# 对缓存 json 进行管理
+async def cache_json_manage(db: TinyDB) -> None:
+    # 移除超过 config.limit 条的记录，即只保留最多 config.limit 条记录
+    retains = db.all()[-config.limit :]
+    db.truncate()
+    db.insert_multiple(retains)
 
 
 # 去重判断

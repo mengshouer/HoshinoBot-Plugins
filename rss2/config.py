@@ -1,6 +1,11 @@
 import os
-from typing import List, Any
+
+from pathlib import Path
 from pydantic import AnyHttpUrl, Extra
+from typing import List, Any
+
+DATA_PATH = Path.cwd() / "data"
+JSON_PATH = DATA_PATH / "rss.json"
 
 class config:
     # 代理地址

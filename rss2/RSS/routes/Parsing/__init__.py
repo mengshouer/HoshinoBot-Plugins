@@ -1,28 +1,36 @@
+import arrow
 import difflib
-import os.path
 import re
 import sqlite3
-import time
 
+from email.utils import parsedate_to_datetime
 from nonebot import logger
-from pathlib import Path
 from pyquery import PyQuery as Pq
+from tinydb import TinyDB
+from tinydb.middlewares import CachingMiddleware
+from tinydb.storages import JSONStorage
 from typing import List, Dict
 
-from . import check_update, send_message
+from .cache_manage import (
+    cache_db_manage,
+    cache_json_manage,
+    duplicate_exists,
+    insert_into_cache_db,
+)
+from .cache_manage import cache_filter
+from .check_update import check_update
 from .download_torrent import down_torrent
-from .duplicate_filter import cache_db_manage, duplicate_exists, insert_into_cache_db
 from .handle_html_tag import handle_bbcode
 from .handle_html_tag import handle_html_tag
 from .handle_images import handle_img
 from .handle_translation import handle_translation
-from .read_or_write_rss_data import write_item
+from .send_message import send_msg
 from .utils import get_proxy
 from .utils import get_summary
+from .write_rss_data import write_item
 from ....RSS.rss_class import Rss
 from ....config import config
-
-FILE_PATH = str(str(Path.cwd()) + os.sep + "data" + os.sep)
+from ....config import DATA_PATH
 
 
 # 订阅器启动的时候将解析器注册到rss实例类？，避免每次推送时再匹配
@@ -193,17 +201,27 @@ class ParsingRss:
         ]
 
     # 开始解析
-    async def start(self, new_rss: dict, old_data: list):
-        # new_data 是完整的 rss 解析后的 dict，old_data 是 list
+    async def start(self, rss_name: str, new_rss: dict):
+        # new_data 是完整的 rss 解析后的 dict
         # 前置处理
+        rss_title = new_rss.get("feed").get("title")
+        new_data = new_rss.get("entries")
+        _file = DATA_PATH / (rss_name + ".json")
+        db = TinyDB(
+            _file,
+            storage=CachingMiddleware(JSONStorage),
+            encoding="utf-8",
+            sort_keys=True,
+            indent=4,
+            ensure_ascii=False,
+        )
         self.state.update(
             {
-                "rss_title": new_rss.get("feed").get("title"),
-                "new_rss": new_rss,
-                "new_data": new_rss.get("entries"),
-                "old_data": old_data,
+                "rss_title": rss_title,
+                "new_data": new_data,
                 "change_data": [],  # 更新的消息列表
                 "conn": None,  # 数据库连接
+                "tinydb": db,  # 缓存 json
             }
         )
         for h in self.before_handler:
@@ -251,9 +269,8 @@ class ParsingRss:
 # 检查更新
 @ParsingBase.append_before_handler(priority=10)
 async def handle_check_update(rss: Rss, state: dict):
-    change_data = await check_update.check_update(
-        state.get("new_data"), state.get("old_data")
-    )
+    db = state.get("tinydb")
+    change_data = await check_update(db, state.get("new_data"))
     return {"change_data": change_data}
 
 
@@ -261,20 +278,20 @@ async def handle_check_update(rss: Rss, state: dict):
 @ParsingBase.append_before_handler(priority=11)
 async def handle_check_update(rss: Rss, state: dict):
     change_data = state.get("change_data")
-    new_rss = state.get("new_rss")
+    db = state.get("tinydb")
     for item in change_data.copy():
         summary = get_summary(item)
         # 检查是否包含屏蔽词
         if config.black_word and re.findall("|".join(config.black_word), summary):
             logger.info("内含屏蔽词，已经取消推送该消息")
-            write_item(rss=rss, new_rss=new_rss, new_item=item)
+            write_item(db, item)
             change_data.remove(item)
             continue
         # 检查是否匹配关键词 使用 down_torrent_keyword 字段,命名是历史遗留导致，实际应该是白名单关键字
         if rss.down_torrent_keyword and not re.search(
             rss.down_torrent_keyword, summary
         ):
-            write_item(rss=rss, new_rss=new_rss, new_item=item)
+            write_item(db, item)
             change_data.remove(item)
             continue
         # 检查是否匹配黑名单关键词 使用 black_keyword 字段
@@ -282,7 +299,7 @@ async def handle_check_update(rss: Rss, state: dict):
             re.search(rss.black_keyword, item["title"])
             or re.search(rss.black_keyword, summary)
         ):
-            write_item(rss=rss, new_rss=new_rss, new_item=item)
+            write_item(db, item)
             change_data.remove(item)
             continue
         # 检查是否只推送有图片的消息
@@ -290,7 +307,7 @@ async def handle_check_update(rss: Rss, state: dict):
             r"<img.+?>|\[img]", summary
         ):
             logger.info(f"{rss.name} 已开启仅图片/仅含有图片，该消息没有图片，将跳过")
-            write_item(rss=rss, new_rss=new_rss, new_item=item)
+            write_item(db, item)
             change_data.remove(item)
 
     return {"change_data": change_data}
@@ -300,15 +317,15 @@ async def handle_check_update(rss: Rss, state: dict):
 @ParsingBase.append_before_handler(priority=12)
 async def handle_check_update(rss: Rss, state: dict):
     change_data = state.get("change_data")
-    new_rss = state.get("new_rss")
     conn = state.get("conn")
+    db = state.get("tinydb")
 
     # 检查是否启用去重 使用 duplicate_filter_mode 字段
     if not rss.duplicate_filter_mode:
         return {"change_data": change_data}
 
     if not conn:
-        conn = sqlite3.connect(FILE_PATH + "cache.db")
+        conn = sqlite3.connect(DATA_PATH / "cache.db")
         conn.set_trace_callback(logger.debug)
 
     await cache_db_manage(conn)
@@ -324,7 +341,7 @@ async def handle_check_update(rss: Rss, state: dict):
             summary=summary,
         )
         if is_duplicate:
-            write_item(rss=rss, new_rss=new_rss, new_item=item)
+            write_item(db, item)
             delete.append(index)
         else:
             change_data[index]["image_hash"] = str(image_hash)
@@ -480,20 +497,14 @@ async def handle_torrent(
 async def handle_date(
     rss: Rss, state: dict, item: dict, item_msg: str, tmp: str, tmp_state: dict
 ) -> str:
-    date = (
-        item.get("updated_parsed")
-        if item.get("updated_parsed")
-        else item.get("published_parsed")
-    )
-    if date:
-        rss_time = time.mktime(date)
-        # 时差处理，待改进
-        if rss_time + 28800.0 <= time.time():
-            rss_time += 28800.0
-        return "日期：" + time.strftime("%m月%d日 %H:%M:%S", time.localtime(rss_time))
-    # 没有日期的情况，以当前时间
-    else:
-        return "日期：" + time.strftime("%m月%d日 %H:%M:%S", time.localtime())
+    date = item.get("published", item.get("updated"))
+    try:
+        date = parsedate_to_datetime(date)
+    except TypeError:
+        pass
+    finally:
+        date = arrow.get(date).to("Asia/Shanghai")
+    return f"日期：{date.format('YYYY年MM月DD日 HH:mm:ss')}"
 
 
 # 发送消息
@@ -501,17 +512,28 @@ async def handle_date(
 async def handle_message(
     rss: Rss, state: dict, item: dict, item_msg: str, tmp: str, tmp_state: dict
 ) -> str:
+    db = state.get("tinydb")
+
     # 发送消息并写入文件
-    if await send_message.send_msg(rss=rss, msg=item_msg, item=item):
-        write_item(rss=rss, new_rss=state.get("new_rss"), new_item=item)
+    if await send_msg(rss=rss, msg=item_msg, item=item):
 
         if rss.duplicate_filter_mode:
-            image_hash = item["image_hash"]
             await insert_into_cache_db(
-                conn=state.get("conn"), item=item, image_hash=image_hash
+                conn=state.get("conn"), item=item, image_hash=item["image_hash"]
             )
 
+        if item.get("to_send"):
+            item.pop("to_send")
+
         state["item_count"] += 1
+    else:
+        item["to_send"] = True
+        if not item.get("count"):
+            item["count"] = 1
+        else:
+            item["count"] += 1
+
+    write_item(db, item)
 
     return ""
 
@@ -520,6 +542,7 @@ async def handle_message(
 async def after_handler(rss: Rss, state: dict) -> dict:
     item_count = state.get("item_count")
     conn = state.get("conn")
+    db = state.get("tinydb")
 
     if item_count > 0:
         logger.info(f"{rss.name} 新消息推送完毕，共计：{item_count}")
@@ -528,5 +551,8 @@ async def after_handler(rss: Rss, state: dict) -> dict:
 
     if conn is not None:
         conn.close()
+
+    await cache_json_manage(db)
+    db.close()
 
     return {}

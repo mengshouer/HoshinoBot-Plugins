@@ -4,41 +4,38 @@ from pathlib import Path
 from nonebot import on_command, CommandSession
 from nonebot.permission import *
 
-from .RSS import rss_class
 from .RSS import my_trigger as tr
+from .RSS import rss_class
 
 # 存储目录
 FILE_PATH = str(str(Path.cwd()) + os.sep + "data" + os.sep)
 
 @on_command('deldy', aliases=('drop', '删除订阅'), permission=GROUP_ADMIN|SUPERUSER)
 async def deldy(session: CommandSession):
-    rss_name = session.get('deldy', prompt='输入要删除的订阅名或订阅地址')
-    try:
-        group_id = session.ctx['group_id']
-    except:
-        group_id = None
+    rss_name = session.get('deldy', prompt='输入要删除的订阅名')
+    group_id = session.ctx.get('group_id')
 
-    rss = rss_class.Rss("", "", "-1", "-1")
+    rss = rss_class.Rss()
     if rss.find_name(name=rss_name):
         rss = rss.find_name(name=rss_name)
     else:
-        await session.send('❌ 删除失败！不存在该订阅！')
+        await session.send("❌ 删除失败！不存在该订阅！")
         return
 
     if group_id:
         if rss.delete_group(group=group_id):
             if not rss.group_id and not rss.user_id:
-                rss.delete_rss(rss)
+                rss.delete_rss()
                 await tr.delete_job(rss)
             else:
                 await tr.add_job(rss)
-            await session.send('👏 当前群组取消订阅 {} 成功！'.format(rss.name))
+            await session.send(f"👏 当前群组取消订阅 {rss.name} 成功！")
         else:
-            await session.send('❌ 当前群组没有订阅： {} ！'.format(rss.name))
+            await session.send(f"❌ 当前群组没有订阅： {rss.name} ！")
     else:
-        rss.delete_rss(rss)
+        rss.delete_rss()
         await tr.delete_job(rss)
-        await session.send('👏 订阅 {} 删除成功！'.format(rss.name))
+        await session.send(f"👏 订阅 {rss.name} 删除成功！")
 
 @deldy.args_parser
 async def _(session: CommandSession):

@@ -1,38 +1,35 @@
 from nonebot import on_command, CommandSession
 from nonebot.permission import *
 
-from .RSS import rss_class
 from .RSS import my_trigger as tr
+from .RSS import rss_class
 
 @on_command('add', aliases=('添加订阅', 'sub'), permission=GROUP_ADMIN|SUPERUSER)
 async def add(session: CommandSession):
     user_id = session.ctx['user_id']
-    try:
-        group_id = session.ctx['group_id']
-    except:
-        group_id = None
+    group_id = session.ctx.get('group_id')
     
     rss_dy_link = session.get('add', prompt='请输入\n名称 [订阅地址]\n空格分割、[]表示可选\n私聊默认订阅到当前账号，群聊默认订阅到当前群组\n更多信息可通过 change 命令修改\nhttps://github.com/Quan666/ELF_RSS/wiki/%E4%BD%BF%E7%94%A8%E6%95%99%E7%A8%8B')
 
     dy = rss_dy_link.split(" ")
 
-    rss = rss_class.Rss(name="", url="", user_id="-1", group_id="-1")
+    rss = rss_class.Rss()
     # 判断是否有该名称订阅，有就将当前qq或群加入订阅
     try:
         name = dy[0]
     except IndexError:
-        await session.send('❌ 输入的订阅名为空！')
+        await session.send("❌ 输入的订阅名为空！")
         return
 
     async def add_group_or_user(_group_id, _user_id):
         if _group_id:
-            rss.add_group(group=str(_group_id))
+            rss.add_user_or_group(group=str(_group_id))
             await tr.add_job(rss)
-            await session.send('👏 订阅到当前群组成功！')
+            await session.send("👏 订阅到当前群组成功！")
         else:
-            rss.add_user(user=_user_id)
+            rss.add_user_or_group(user=_user_id)
             await tr.add_job(rss)
-            await session.send('👏 订阅到当前账号成功！')
+            await session.send("👏 订阅到当前账号成功！")
 
     if rss.find_name(name=name):
         rss = rss.find_name(name=name)
@@ -42,7 +39,7 @@ async def add(session: CommandSession):
     try:
         url = dy[1]
     except IndexError:
-        await session.send('❌ 输入的订阅地址为空！')
+        await session.send("❌ 输入的订阅地址为空！")
         return
 
     # 去除判断，订阅链接不再唯一，可不同名同链接

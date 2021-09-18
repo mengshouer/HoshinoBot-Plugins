@@ -12,8 +12,10 @@ async def handle_rss_list(rss_list: list) -> str:
     rss_stopped_info_list = [f"{i.name}：{i.url}" for i in rss_list if i.stop]
     if rss_stopped_info_list:
         rss_stopped_info_list.sort()
-        msg_str += f"\n\n其中共有 {len(rss_stopped_info_list)} 条订阅已停止更新：\n\n" + "\n\n".join(
-            rss_stopped_info_list
+        msg_str += (
+            f"\n----------------------\n"
+            f"其中共有 {len(rss_stopped_info_list)} 条订阅已停止更新：\n\n"
+            + "\n\n".join(rss_stopped_info_list)
         )
     return msg_str
 
@@ -29,35 +31,31 @@ async def rssShow(session: CommandSession):
         rss_name = None
 
     user_id = session.ctx['user_id']
-    try:
-        group_id = session.ctx['group_id']
-    except:
-        group_id = None
+    group_id = session.ctx.get('group_id')
 
-    rss = rss_class.Rss("", "", "-1", "-1")
-
+    rss = rss_class.Rss()
     if rss_name:
         rss = rss.find_name(rss_name)
         if not rss:
-            await session.send("❌ 订阅 {} 不存在！".format(rss_name))
+            await session.send(f"❌ 订阅 {rss_name} 不存在！")
             return
         rss_msg = str(rss)
         if group_id:
             # 隐私考虑，群组下不展示除当前群组外的群号和QQ
             if not str(group_id) in rss.group_id:
-                await session.send("❌ 当前群组未订阅 {} ".format(rss_name))
+                await session.send(f"❌ 当前群组未订阅 {rss_name} ")
                 return
             rss_tmp = copy.deepcopy(rss)
             rss_tmp.group_id = [str(group_id), "*"]
             rss_tmp.user_id = ["*"]
             rss_msg = str(rss_tmp)
-        await session.send(str(rss_msg))
+        await session.send(rss_msg)
         return
 
     if group_id:
         rss_list = rss.find_group(group=str(group_id))
         if not rss_list:
-            await session.send('❌ 当前群组没有任何订阅！')
+            await session.send("❌ 当前群组没有任何订阅！")
             return
     else:
         rss_list = rss.find_user(user=user_id)
@@ -66,4 +64,4 @@ async def rssShow(session: CommandSession):
         msg_str = await handle_rss_list(rss_list)
         await session.send(msg_str)
     else:
-        await session.send('❌ 当前没有任何订阅！')
+        await session.send("❌ 当前没有任何订阅！")

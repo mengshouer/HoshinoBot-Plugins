@@ -3,26 +3,28 @@
 import asyncio
 import feedparser
 import httpx
-import os.path
 import re
 
 from nonebot.log import logger
 from pathlib import Path
 from tenacity import retry, stop_after_attempt, stop_after_delay, RetryError, TryAgain
+from tinydb import TinyDB
+from tinydb.storages import JSONStorage
+from tinydb.middlewares import CachingMiddleware
 
 from . import rss_class
 from .routes.Parsing import ParsingRss, get_proxy
-from .routes.Parsing.read_or_write_rss_data import read_rss, write_rss
+from .routes.Parsing.cache_manage import cache_filter
+from .routes.Parsing.check_update import dict_hash
 from ..config import config
-
-FILE_PATH = str(str(Path.cwd()) + os.sep + "data" + os.sep)
+from ..config import DATA_PATH
 
 
 STATUS_CODE = [200, 301, 302]
 # 去掉烦人的 returning true from eof_received() has no effect when using ssl httpx 警告
 asyncio.log.logger.setLevel(40)
 HEADERS = {
-    "Accept": "*/*",
+    "Accept": "application/xhtml+xml,application/xml,*/*",
     "Accept-Language": "en-US,en;q=0.9",
     "Cache-Control": "max-age=0",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36",
@@ -44,15 +46,29 @@ async def start(rss: rss_class.Rss) -> None:
         cookies_str = "及 cookies " if rss.cookies else ""
         logger.error(f"{rss.name}[{rss.get_url()}]抓取失败！已达最大重试次数！请检查订阅地址{cookies_str}！")
         return
-    old_rss = read_rss(rss.name)
-    old_rss_list = old_rss.get("entries")
-    if not old_rss:
-        write_rss(name=rss.name, new_rss=new_rss)
+    # 检查是否存在rss记录
+    _file = DATA_PATH / (rss.name + ".json")
+    if not Path.exists(_file):
+        db = TinyDB(
+            _file,
+            storage=CachingMiddleware(JSONStorage),
+            encoding="utf-8",
+            sort_keys=True,
+            indent=4,
+            ensure_ascii=False,
+        )
+        entries = new_rss.get("entries")
+        result = []
+        for i in entries:
+            i["hash"] = dict_hash(i)
+            result.append(cache_filter(i))
+        db.insert_multiple(result)
+        db.close()
         logger.info(f"{rss.name} 第一次抓取成功！")
         return
 
     pr = ParsingRss(rss=rss)
-    await pr.start(new_rss=new_rss, old_data=old_rss_list)
+    await pr.start(rss_name=rss.name, new_rss=new_rss)
 
 
 # 获取 RSS 并解析为 json ，失败重试
