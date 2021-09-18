@@ -16,7 +16,7 @@ class config:
     rsshub_backup: List[AnyHttpUrl] = []
     
     # 缓存rss条数
-    limit = 50
+    limit = 500
     
     # 图片压缩大小 kb * 1024 = MB
     zip_size: int = 2 * 1024
