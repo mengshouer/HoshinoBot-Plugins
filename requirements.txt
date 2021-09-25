@@ -21,4 +21,4 @@ ImageHash
 pydantic
 tenacity
 bbcode
-tinydb
+tinydb~=4.5.1

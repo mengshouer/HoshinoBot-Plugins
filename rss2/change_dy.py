@@ -28,14 +28,14 @@ test1[,test2,...] qq=,123,234 qun=-1
 仅含有图片不同于仅图片，除了图片还会发送正文中的其他文本信息
 proxy、tl、ot、op、ohp、downopen、upgroup、stop 值为 1/0
 去重模式分为按链接(link)、标题(title)、图片(image)判断
-其中 image 模式,出于性能考虑以及避免误伤情况发生,生效对象限定为只带 1 张图片的消息,
-此外,如果属性中带有 or 说明判断逻辑是任一匹配即去重,默认为全匹配
+其中 image 模式，出于性能考虑以及避免误伤情况发生，生效对象限定为只带 1 张图片的消息，
+此外，如果属性中带有 or 说明判断逻辑是任一匹配即去重，默认为全匹配
 白名单关键词支持正则表达式，匹配时推送消息及下载，设为空(wkey=)时不生效
 黑名单关键词同白名单一样，只是匹配时不推送，两者可以一起用
 正文待移除内容因为参数解析的缘故，格式必须如：rm_list='a' 或 rm_list='a','b'
 该处理过程是在解析 html 标签后进行的
 要将该参数设为空使用 rm_list='-1'
-QQ、群号、去重模式前加英文逗号表示追加,-1设为空
+QQ、群号、去重模式前加英文逗号表示追加，-1设为空
 各个属性空格分割
 详细：https://oy.mk/cUm"'''.strip()
 
@@ -83,7 +83,6 @@ async def handle_change_list(
     if key_to_change == "name":
         await tr.delete_job(rss)
         rss.rename_file(DATA_PATH / (value_to_change + ".json"))
-    # 暂时禁止群管理员修改 QQ / 群号，如要取消订阅可以使用 deldy 命令
     elif (key_to_change in ["qq", "qun"] and not group_id) or key_to_change == "mode":
         value_to_change = handle_property(
             value_to_change, getattr(rss, attribute_dict[key_to_change])
@@ -146,13 +145,17 @@ async def change(session: CommandSession):
     name_list = change_info.split(" ")[0].split(",")
     rss = rss_class.Rss()
     rss_list = [rss.find_name(name=name) for name in name_list]
-    rss_list = list(filter(lambda x: x is not None, rss_list))
+    rss_list = [rss for rss in rss_list if rss]
 
     if group_id:
-        rss_list = list(filter(lambda x: str(group_id) in x.group_id, rss_list))
+        if re.search(" (qq|qun)=", change_info):
+            await session.send("❌ 禁止在群组中修改 QQ号 / 群号！如要取消订阅请使用 deldy 命令！")
+            return
+        rss_list = [rss for rss in rss_list if str(group_id) in rss.group_id]
 
     if not rss_list:
         await session.send("❌ 请检查是否存在以下问题：\n1.要修改的订阅名不存在对应的记录\n2.当前群组无权操作")
+        return
     else:
         if len(rss_list) > 1 and " name=" in change_info:
             await session.send("❌ 禁止将多个订阅批量改名！会因为名称相同起冲突！")
