@@ -103,7 +103,8 @@ async def start():
         rss = rss_class.Rss()
         rss_list = rss.read_rss()  # 读取list
         if not rss_list:
-            raise Exception("第一次启动，你还没有订阅，记得添加哟！")
+            logger.warning("第一次启动，你还没有订阅，记得添加哟！")
+            return
         for rss_tmp in rss_list:
             if not rss_tmp.stop:
                 await tr.add_job(rss_tmp)  # 创建检查更新任务
