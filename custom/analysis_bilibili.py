@@ -2,11 +2,8 @@ import re
 import json
 import aiohttp
 import asyncio
-import lxml.html
-import urllib.parse
 from datetime import datetime
 from hoshino import Service
-from hoshino.util import escape
 
 sv = Service('analysis_bilibili')
 
@@ -14,7 +11,7 @@ analysis_stat = {}   # analysis_stat: video_url(vurl)
 
 @sv.on_message('group')
 async def rex_bilibili(bot, ev):
-    text = escape(str(ev.message).strip())
+    text = str(ev.message).strip()
     if re.search(r"(b23.tv)|(bili(22|23|33|2233).cn)", text, re.I):
         # 提前处理短链接，避免解析到其他的
         text = await b23_extract(text)
@@ -108,24 +105,18 @@ async def extract(text:str):
         return None
 
 async def search_bili_by_title(title: str):
-    brackets_pattern = re.compile(r'[()\[\]{}（）【】]')
-    title_without_brackets = brackets_pattern.sub(' ', title).strip()
-    search_url = f'https://search.bilibili.com/video?keyword={urllib.parse.quote(title_without_brackets)}'
+    search_url = f'http://api.bilibili.com/x/web-interface/search/all/v2?keyword={title}'
 
-    try:
-        async with aiohttp.request('GET', search_url, timeout=aiohttp.client.ClientTimeout(10)) as resp:
-            text = await resp.text(encoding='utf8')
-            content: lxml.html.HtmlElement = lxml.html.fromstring(text)
-    except asyncio.TimeoutError:
-        return None
-
-    for video in content.xpath('//li[@class="video-item matrix"]/a[@class="img-anchor"]'):
-        if title == ''.join(video.xpath('./attribute::title')):
-            url = ''.join(video.xpath('./attribute::href'))
-            break
-    else:
-        url = None
-    return url
+    async with aiohttp.request('GET', search_url, timeout=aiohttp.client.ClientTimeout(10)) as resp:
+        r = await resp.json()
+    
+    result = r["data"]["result"]
+    for i in result:
+        if i.get("result_type") != "video":
+            continue
+        # 只返回第一个结果
+        url = i["data"][0].get("arcurl")
+        return url
 
 async def video_detail(url):
     try:
@@ -196,17 +187,20 @@ async def live_detail(url):
         if lock_status:
             lock_time = res['data']['room_info']['lock_time']
             lock_time = datetime.fromtimestamp(lock_time).strftime("%Y-%m-%d %H:%M:%S")
-            title = f"(已封禁)直播间封禁至：{lock_time}\n"
+            title = f"[已封禁]直播间封禁至：{lock_time}\n"
         elif live_status == 1:
-            title = f"(直播中)标题：{title}\n"
+            title = f"[直播中]标题：{title}\n"
         elif live_status == 2:
-            title = f"(轮播中)标题：{title}\n"
+            title = f"[轮播中]标题：{title}\n"
         else:
-            title = f"(未开播)标题：{title}\n"
+            title = f"[未开播]标题：{title}\n"
         up = f"主播：{uname} 当前分区：{parent_area_name}-{area_name} 人气上一次刷新值：{online}\n"
         if tags:
             tags = f"标签：{tags}\n"
-        player = f"独立播放器：https://www.bilibili.com/blackboard/live/live-activity-player.html?enterTheRoom=0&cid={room_id}"
+        if live_status:
+            player = f"独立播放器：https://www.bilibili.com/blackboard/live/live-activity-player.html?enterTheRoom=0&cid={room_id}"
+        else:
+            player = ""
         msg = str(vurl)+str(title)+str(up)+str(tags)+str(player)
         return msg, vurl
     except Exception as e:
