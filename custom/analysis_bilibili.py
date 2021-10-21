@@ -106,6 +106,20 @@ async def extract(text:str):
     except:
         return None
 
+sv2 = Service('search_bilibili_video')
+@sv2.on_prefix('搜视频')
+async def search_bilibili_video_by_title(bot, ev):
+    title = ev.message.extract_plain_text()
+    vurl = await search_bili_by_title(title)
+    msg = await bili_keyword(ev.group_id, vurl)
+    try:
+        await bot.send(ev, msg)
+    except:
+        # 避免简介有风控内容无法发送
+        await bot.send(ev, "此次解析可能被风控，尝试去除简介后发送！")
+        msg = re.sub(r"简介.*", "", msg)
+        await bot.send(ev, msg)
+
 async def search_bili_by_title(title: str):
     search_url = f'http://api.bilibili.com/x/web-interface/search/all/v2?keyword={title}'
 
