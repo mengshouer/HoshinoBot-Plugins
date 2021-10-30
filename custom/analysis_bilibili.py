@@ -15,7 +15,7 @@ async def rex_bilibili(bot, ev):
     if re.search(r"(b23.tv)|(bili(22|23|33|2233).cn)", text, re.I):
         # 提前处理短链接，避免解析到其他的
         text = await b23_extract(text)
-    patterns = r"(live.bilibili.com)|(bilibili.com/(video|read|bangumi))|(^(av|cv)(\d+))|(^BV([a-zA-Z0-9])+)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)|(QQ小程序&#93;哔哩哔哩)"
+    patterns = r"(live.bilibili.com)|(bilibili.com/(video|read|bangumi))|(^(av|cv)(\d+))|(^BV([a-zA-Z0-9]{10})+)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)|(QQ小程序&#93;哔哩哔哩)"
     match = re.compile(patterns, re.I).search(text)
     if match:
         group_id = ev.group_id
@@ -82,7 +82,7 @@ async def b23_extract(text):
 async def extract(text:str):
     try:
         aid = re.compile(r'av\d+', re.I).search(text)
-        bvid = re.compile(r'BV([a-zA-Z0-9])+', re.I).search(text)
+        bvid = re.compile(r'BV([a-zA-Z0-9]{10})+', re.I).search(text)
         epid = re.compile(r'ep\d+', re.I).search(text)
         ssid = re.compile(r'ss\d+', re.I).search(text)
         mdid = re.compile(r'md\d+', re.I).search(text)
