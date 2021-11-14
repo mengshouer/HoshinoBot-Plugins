@@ -1,1 +1,9 @@
-from . import nga, pixiv, south_plus, weibo, danbooru  # noqa
+from . import (
+    danbooru,
+    nga,
+    pixiv,
+    south_plus,
+    twitter,
+    weibo,
+    youtube,
+)  # noqa
