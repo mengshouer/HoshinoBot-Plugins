@@ -6,22 +6,21 @@ from . import RSS_class
 from . import RWlist
 import nonebot
 import asyncio
-from apscheduler.triggers.interval import IntervalTrigger # 间隔触发器
+from apscheduler.triggers.interval import IntervalTrigger  # 间隔触发器
 from nonebot import on_command, scheduler
 import hoshino
 import time
+
 # 检测某个rss更新 #任务体
-async def check_update(rss:RSS_class.rss):
-    logger.info('检查 ' + rss.name + ' 更新')
+async def check_update(rss: RSS_class.rss):
+    logger.info("检查 " + rss.name + " 更新")
     await rsshub.getRSS(rss)
 
-def rss_trigger(times:int,rss:RSS_class.rss):
+
+def rss_trigger(times: int, rss: RSS_class.rss):
     # 制作一个“time分钟/次”触发器
-    trigger = IntervalTrigger(
-        minutes=times,
-        jitter=10
-    )
-    job_defaults = {'max_instances': 10}
+    trigger = IntervalTrigger(minutes=times, jitter=10)
+    job_defaults = {"max_instances": 10}
     # 添加任务
     scheduler.add_job(
         func=check_update,  # 要添加任务的函数，不要带参数

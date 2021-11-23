@@ -6,13 +6,15 @@ from .RSSHub import rsstrigger as TR
 import logging
 from nonebot.log import logger
 import nonebot
-from apscheduler.triggers.interval import IntervalTrigger # 间隔触发器
+from apscheduler.triggers.interval import IntervalTrigger  # 间隔触发器
 from nonebot.permission import *
 import copy as cp
-# 存储目录
-file_path = './data/'
 
-@on_command('clearrss', aliases=('cleardy','rssclear'), permission=SUPERUSER)
+# 存储目录
+file_path = "./data/"
+
+
+@on_command("clearrss", aliases=("cleardy", "rssclear"), permission=SUPERUSER)
 async def cleargroup(session: CommandSession):
     bot = session.bot
     # 获取bot的群列表
@@ -20,11 +22,11 @@ async def cleargroup(session: CommandSession):
         self_ids = bot._wsr_api_clients.keys()
         for sid in self_ids:
             gl = await bot.get_group_list(self_id=sid)
-            gl = [ "{group_id}".format_map(g) for g in gl ]
+            gl = ["{group_id}".format_map(g) for g in gl]
     except BaseException as e:
-        await bot.send("Error!"+str(e))
+        await bot.send("Error!" + str(e))
         return
-    
+
     try:
         # 读取rss列表
         list_rss = RWlist.readRss()
@@ -32,20 +34,20 @@ async def cleargroup(session: CommandSession):
             if rss_.group_id:
                 # 完整复制一份rss_
                 rss_tmp = cp.deepcopy(rss_)
-                i,g = 0,0
+                i, g = 0, 0
                 while g < len(rss_.group_id):
                     if rss_.group_id[g] not in gl:
                         rss_tmp.group_id.remove(rss_.group_id[g])
                         i += 1
                     g += 1
                 if i:
-                    await session.send(f'{rss_.name}此次成功清理{i}个群聊！')
+                    await session.send(f"{rss_.name}此次成功清理{i}个群聊！")
                 # 处理完毕，更新数据
                 if not rss_tmp.group_id and not rss_tmp.user_id:
                     list_rss.remove(rss_)
                     scheduler.remove_job(rss_.name)
                     try:
-                        os.remove(file_path+rss_.name+".json")
+                        os.remove(file_path + rss_.name + ".json")
                         logger.info(f"订阅{rss_.name}已无订阅目标，删除整个订阅")
                     except BaseException as e:
                         logger.info(e)
@@ -56,5 +58,5 @@ async def cleargroup(session: CommandSession):
                     list_rss.append(rss_tmp)
                     RWlist.writeRss(list_rss)
     except BaseException as e:
-        #logger.info(e)
-        await session.send('你还没有任何订阅！')
+        # logger.info(e)
+        await session.send("你还没有任何订阅！")

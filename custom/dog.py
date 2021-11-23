@@ -1,7 +1,8 @@
 import httpx
 from nonebot import on_command, CommandSession
 
-@on_command('/dog', aliases=('!dog', '\\dog'), only_to_me=False)
+
+@on_command("/dog", aliases=("!dog", "\\dog"), only_to_me=False)
 async def dog(session: CommandSession):
     try:
         try:
@@ -18,4 +19,3 @@ async def dog(session: CommandSession):
     except Exception as e:
         msg = "Error: {}".format(type(e))
     await session.send(msg)
-    

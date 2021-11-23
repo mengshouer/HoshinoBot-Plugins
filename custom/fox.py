@@ -1,7 +1,8 @@
 import httpx
 from nonebot import on_command, CommandSession
 
-@on_command('/fox', aliases=('!fox', '\\fox'), only_to_me=False)
+
+@on_command("/fox", aliases=("!fox", "\\fox"), only_to_me=False)
 async def fox(session: CommandSession):
     try:
         api_url = "https://randomfox.ca/floof/"
@@ -12,4 +13,3 @@ async def fox(session: CommandSession):
     except Exception as e:
         msg = "Error: {}".format(type(e))
     await session.send(msg)
-    

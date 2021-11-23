@@ -1,5 +1,6 @@
 import nonebot
 import aiocqhttp
+
 try:
     import ujson as json
 except:
@@ -7,6 +8,7 @@ except:
 from . import *
 
 bot = nonebot.get_bot()
+
 
 @bot.on_message()
 async def custom_reply(event: aiocqhttp.Event):
@@ -18,5 +20,5 @@ async def custom_reply(event: aiocqhttp.Event):
                     ckey = key.lower()
                     cmsg = msg.lower()
                 if ckey == cmsg:
-                    await bot.send(event,CRdata.data[key])
+                    await bot.send(event, CRdata.data[key])
                     break
