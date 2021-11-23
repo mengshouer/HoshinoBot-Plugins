@@ -5,6 +5,7 @@ from nonebot.permission import *
 
 from .RSS import rss_class
 
+
 async def handle_rss_list(rss_list: list) -> str:
     rss_info_list = [f"{i.name}：{i.url}" for i in rss_list]
     rss_info_list.sort()
@@ -22,7 +23,7 @@ async def handle_rss_list(rss_list: list) -> str:
 
 # 不带订阅名称默认展示当前群组或账号的订阅
 # 带订阅名称就显示该订阅的
-@on_command('show', aliases=('查看订阅'), permission=GROUP_ADMIN|SUPERUSER)
+@on_command("show", aliases=("查看订阅"), permission=GROUP_ADMIN | SUPERUSER)
 async def rssShow(session: CommandSession):
     args = session.current_arg.strip()
     if args:
@@ -30,8 +31,8 @@ async def rssShow(session: CommandSession):
     else:
         rss_name = None
 
-    user_id = session.ctx['user_id']
-    group_id = session.ctx.get('group_id')
+    user_id = session.ctx["user_id"]
+    group_id = session.ctx.get("group_id")
 
     rss = rss_class.Rss()
     if rss_name:

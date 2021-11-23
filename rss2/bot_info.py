@@ -1,5 +1,6 @@
 from typing import List
 
+
 async def get_bot_qq(bot) -> List[int]:
     return bot._wsr_api_clients.keys()
 

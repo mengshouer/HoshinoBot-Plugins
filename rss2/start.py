@@ -114,8 +114,7 @@ async def start():
         logger.debug(e)
         raise
 
-@nonebot.scheduler.scheduled_job('date', misfire_grace_time=10)
+
+@nonebot.scheduler.scheduled_job("date", misfire_grace_time=10)
 async def _():
-    await asyncio.gather(
-        start(),
-    )
+    await asyncio.gather(start(),)

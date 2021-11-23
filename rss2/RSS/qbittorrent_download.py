@@ -49,7 +49,10 @@ async def send_msg(msg: str) -> list:
                 continue
             msg_id.append(
                 await bot.send_msg(
-                    self_id=sid, message_type="group", group_id=int(group_id), message=msg
+                    self_id=sid,
+                    message_type="group",
+                    group_id=int(group_id),
+                    message=msg,
                 )
             )
     return msg_id
@@ -196,7 +199,7 @@ async def check_down_status(hash_str: str, group_ids: list, name: str):
                     await send_msg(f"{name}\nHash：{hash_str}\n开始上传到群：{group_id}")
                     try:
                         await bot.call_action(
-                        action="upload_group_file",
+                            action="upload_group_file",
                             group_id=group_id,
                             file=path,
                             name=tmp["name"],

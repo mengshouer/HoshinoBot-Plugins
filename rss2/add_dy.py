@@ -4,12 +4,16 @@ from nonebot.permission import *
 from .RSS import my_trigger as tr
 from .RSS import rss_class
 
-@on_command('add', aliases=('添加订阅', 'sub'), permission=GROUP_ADMIN|SUPERUSER)
+
+@on_command("add", aliases=("添加订阅", "sub"), permission=GROUP_ADMIN | SUPERUSER)
 async def add(session: CommandSession):
-    user_id = session.ctx['user_id']
-    group_id = session.ctx.get('group_id')
-    
-    rss_dy_link = session.get('add', prompt='请输入\n名称 [订阅地址]\n空格分割、[]表示可选\n私聊默认订阅到当前账号，群聊默认订阅到当前群组\n更多信息可通过 change 命令修改\nhttps://github.com/Quan666/ELF_RSS/wiki/%E4%BD%BF%E7%94%A8%E6%95%99%E7%A8%8B')
+    user_id = session.ctx["user_id"]
+    group_id = session.ctx.get("group_id")
+
+    rss_dy_link = session.get(
+        "add",
+        prompt="请输入\n名称 [订阅地址]\n空格分割、[]表示可选\n私聊默认订阅到当前账号，群聊默认订阅到当前群组\n更多信息可通过 change 命令修改\nhttps://github.com/Quan666/ELF_RSS/wiki/%E4%BD%BF%E7%94%A8%E6%95%99%E7%A8%8B",
+    )
 
     dy = rss_dy_link.split(" ")
 
@@ -61,6 +65,7 @@ async def add(session: CommandSession):
     rss.url = url
     await add_group_or_user(group_id, user_id)
 
+
 # add.args_parser 装饰器将函数声明为 add 命令的参数解析器
 # 命令解析器用于将用户输入的参数解析成命令真正需要的数据
 @add.args_parser
@@ -73,13 +78,13 @@ async def _(session: CommandSession):
         if stripped_arg:
             # 第一次运行参数不为空，意味着用户直接将订阅信息跟在命令名后面，作为参数传入
             # 例如用户可能发送了：订阅 test1 /twitter/user/key_official 1447027111 1037939056 1 true true #订阅名 订阅地址 qq 群组 更新时间 代理 第三方
-            session.state['add'] = stripped_arg
+            session.state["add"] = stripped_arg
         return
 
     if not stripped_arg:
         # 用户没有发送有效的订阅（而是发送了空白字符），则提示重新输入
         # 这里 session.pause() 将会发送消息并暂停当前会话（该行后面的代码不会被运行）
-        session.pause('输入不能为空！')
+        session.pause("输入不能为空！")
 
     # 如果当前正在向用户询问更多信息（例如本例中的要压缩的链接），且用户输入有效，则放入会话状态
     session.state[session.current_key] = stripped_arg

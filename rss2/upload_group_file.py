@@ -4,6 +4,7 @@ from nonebot import on_command, CommandSession, logger
 from qbittorrent import Client
 from .config import config
 
+
 async def get_qb(session: CommandSession):
     try:
         qb = Client(config.qb_web_url)
@@ -67,7 +68,10 @@ async def check_down_status(hash_str: str, group_id: int, session: CommandSessio
                     "开始上传"
                 )
                 await bot.call_action(
-                    action="upload_group_file", group_id=group_id, file=path, name=tmp["name"]
+                    action="upload_group_file",
+                    group_id=group_id,
+                    file=path,
+                    name=tmp["name"],
                 )
             except Exception:
                 continue
@@ -79,9 +83,9 @@ async def check_down_status(hash_str: str, group_id: int, session: CommandSessio
         )
 
 
-@on_command('uploadfile', only_to_me=True)
+@on_command("uploadfile", only_to_me=True)
 async def upload_group_file(session: CommandSession):
-    hash_str = re.search('[a-f0-9]{40}', str(session.event.message))[0]
-    if session.event.message_type == 'private':
-        await session.finish('请在群聊中使用哦')
+    hash_str = re.search("[a-f0-9]{40}", str(session.event.message))[0]
+    if session.event.message_type == "private":
+        await session.finish("请在群聊中使用哦")
     await check_down_status(hash=hash, group_id=session.event.group_id, session=session)

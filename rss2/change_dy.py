@@ -11,7 +11,7 @@ from .RSS import my_trigger as tr
 from .RSS import rss_class
 from .config import DATA_PATH, JSON_PATH
 
-helpmsg ='''请输入要修改的订阅
+helpmsg = '''请输入要修改的订阅
 订阅名[,订阅名,...] 属性=值[ 属性=值 ...]
 如:
 test1[,test2,...] qq=,123,234 qun=-1
@@ -113,6 +113,7 @@ async def handle_change_list(
         value_to_change = int(value_to_change)
     setattr(rss, attribute_dict.get(key_to_change), value_to_change)
 
+
 # 参数特殊处理：正文待移除内容
 async def handle_rm_list(rss_list: List[rss_class.Rss], change_info: str) -> list:
     rm_list_exist = re.search(" rm_list='.+'", change_info)
@@ -137,10 +138,11 @@ async def handle_rm_list(rss_list: List[rss_class.Rss], change_info: str) -> lis
 
     return change_list
 
-@on_command('change', aliases=('修改订阅', 'moddy'), permission=GROUP_ADMIN|SUPERUSER)
+
+@on_command("change", aliases=("修改订阅", "moddy"), permission=GROUP_ADMIN | SUPERUSER)
 async def change(session: CommandSession):
-    change_info = session.get('change', prompt=helpmsg)
-    group_id = session.ctx.get('group_id')
+    change_info = session.get("change", prompt=helpmsg)
+    group_id = session.ctx.get("group_id")
 
     name_list = change_info.split(" ")[0].split(",")
     rss = rss_class.Rss()
@@ -187,11 +189,7 @@ async def change(session: CommandSession):
 
         # 参数解析完毕，写入
         db = TinyDB(
-            JSON_PATH,
-            encoding="utf-8",
-            sort_keys=True,
-            indent=4,
-            ensure_ascii=False,
+            JSON_PATH, encoding="utf-8", sort_keys=True, indent=4, ensure_ascii=False,
         )
         db.update(rss.__dict__, Query().name == str(rss_name))
 
@@ -228,13 +226,13 @@ async def _(session: CommandSession):
     if session.is_first_run:
         # 该命令第一次运行（第一次进入命令会话）
         if stripped_arg:
-            session.state['change'] = stripped_arg
+            session.state["change"] = stripped_arg
         return
 
     if not stripped_arg:
         # 用户没有发送有效的订阅（而是发送了空白字符），则提示重新输入
         # 这里 session.pause() 将会发送消息并暂停当前会话（该行后面的代码不会被运行）
-        session.pause('输入不能为空！')
+        session.pause("输入不能为空！")
 
     # 如果当前正在向用户询问更多信息，且用户输入有效，则放入会话状态
     session.state[session.current_key] = stripped_arg

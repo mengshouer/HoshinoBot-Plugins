@@ -9,7 +9,7 @@ from nonebot import logger
 from pyquery import PyQuery as Pq
 from tenacity import retry, stop_after_attempt, stop_after_delay, RetryError
 
-from .utils import get_proxy
+from .utils import get_proxy, get_summary
 from ....config import config
 
 STATUS_CODE = [200, 301, 302]
@@ -20,8 +20,7 @@ STATUS_CODE = [200, 301, 302]
 async def resize_gif(url: str, resize_ratio: int = 2) -> BytesIO:
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            url="https://s3.ezgif.com/resize",
-            data={"new-image-url": url},
+            url="https://s3.ezgif.com/resize", data={"new-image-url": url},
         )
         d = Pq(response.text)
         next_url = d("form").attr("action")
@@ -49,8 +48,7 @@ async def resize_gif(url: str, resize_ratio: int = 2) -> BytesIO:
 async def get_preview_gif_from_video(url: str) -> str:
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            url="https://s3.ezgif.com/video-to-gif",
-            data={"new-image-url": url},
+            url="https://s3.ezgif.com/video-to-gif", data={"new-image-url": url},
         )
         d = Pq(response.text)
         video_length = re.search(
@@ -203,8 +201,21 @@ async def handle_img_combo(url: str, img_proxy: bool) -> str:
     return f"\n图片走丢啦: {url}\n"
 
 
+async def handle_img_combo_with_content(gif_url: str, content: bytes) -> str:
+    resize_content = await zip_pic(gif_url, content)
+    img_base64 = await get_pic_base64(resize_content)
+    if img_base64:
+        return f"[CQ:image,file=base64://{img_base64}]"
+    return f"\n图片走丢啦\n"
+
+
 # 处理图片、视频
-async def handle_img(html, img_proxy: bool, img_num: int) -> str:
+async def handle_img(item: dict, img_proxy: bool, img_num: int) -> str:
+    if item.get("image_content"):
+        return await handle_img_combo_with_content(
+            item.get("gif_url"), item.get("image_content")
+        )
+    html = Pq(get_summary(item))
     img_str = ""
     # 处理图片
     doc_img = list(html("img").items())

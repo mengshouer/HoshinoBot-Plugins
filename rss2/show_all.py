@@ -6,14 +6,19 @@ from nonebot.permission import *
 from .RSS import rss_class
 from .show_dy import handle_rss_list
 
-@on_command("showall", aliases=("show_all", "selectall", "select_all", "所有订阅"), permission=GROUP_ADMIN|SUPERUSER)
+
+@on_command(
+    "showall",
+    aliases=("show_all", "selectall", "select_all", "所有订阅"),
+    permission=GROUP_ADMIN | SUPERUSER,
+)
 async def rssShowAll(session: CommandSession):
     args = session.current_arg_text
     if args:
         search_keyword = args  # 如果用户发送了参数则直接赋值
     else:
         search_keyword = None
-    group_id = session.ctx.get('group_id')
+    group_id = session.ctx.get("group_id")
 
     rss = rss_class.Rss()
     if group_id:

@@ -8,14 +8,7 @@ def get_proxy(open_proxy: bool) -> dict:
     if not open_proxy:
         return {}
     proxy = config.rss_proxy
-    return (
-        httpx.Proxy(
-            url="http://" + proxy,
-            mode="DEFAULT",
-        )
-        if proxy
-        else {}
-    )
+    return httpx.Proxy(url="http://" + proxy, mode="DEFAULT",) if proxy else {}
 
 
 # 获取正文

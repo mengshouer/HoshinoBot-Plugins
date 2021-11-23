@@ -12,7 +12,7 @@ async def send_msg(rss: rss_class.Rss, msg: str, item: dict) -> bool:
     flag = False
     if not msg:
         return False
-    bot_qq = await get_bot_qq(bot)
+    bot_qq = list(await get_bot_qq(bot))
     if rss.user_id:
         for sid in bot_qq:
             friend_list = await get_bot_friend_list(bot, sid)
@@ -22,11 +22,14 @@ async def send_msg(rss: rss_class.Rss, msg: str, item: dict) -> bool:
                     continue
                 try:
                     await bot.send_msg(
-                        self_id=sid, message_type="private", user_id=int(user_id), message=str(msg)
+                        self_id=sid,
+                        message_type="private",
+                        user_id=int(user_id),
+                        message=str(msg),
                     )
                     flag = True
                 except Exception as e:
-                    logger.error(f'发送QQ号[{user_id}]错误！ E: {e}')
+                    logger.error(f"发送QQ号[{user_id}]错误！ E: {e}")
 
     if rss.group_id:
         for sid in bot_qq:
@@ -37,9 +40,12 @@ async def send_msg(rss: rss_class.Rss, msg: str, item: dict) -> bool:
                     continue
                 try:
                     await bot.send_msg(
-                        self_id=sid, message_type="group", group_id=int(group_id), message=str(msg)
+                        self_id=sid,
+                        message_type="group",
+                        group_id=int(group_id),
+                        message=str(msg),
                     )
                     flag = True
                 except Exception as e:
-                    logger.error(f'发送QQ号[{user_id}]错误！ E: {e}')
+                    logger.error(f"发送QQ号[{user_id}]错误！ E: {e}")
     return flag
