@@ -26,7 +26,7 @@ async def handle_translation(content: str) -> str:
             if sl == "zh-cn" or sl == "zh-tw":
                 sl = "zh"
             dltext = "\nDeepL翻译：" + deepl.translate(
-                source_language=sl, target_language="ZH", text=text
+                source_language=sl, target_language="ZH", text=content
             )
             return dltext
     except Exception as e:
