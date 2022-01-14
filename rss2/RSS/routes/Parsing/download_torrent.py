@@ -1,6 +1,6 @@
-from .utils import get_proxy
 from ... import rss_class
 from ...qbittorrent_download import start_down
+from .utils import get_proxy
 
 
 # 下载种子判断
@@ -21,7 +21,10 @@ async def down_torrent(rss: rss_class, item: dict, proxy=None) -> list:
         ):
             hash_list.append(
                 await start_down(
-                    url=tmp["href"], group_ids=rss.group_id, name=rss.name, proxy=proxy,
+                    url=tmp["href"],
+                    group_ids=rss.group_id,
+                    name=rss.name,
+                    proxy=proxy,
                 )
             )
     return hash_list

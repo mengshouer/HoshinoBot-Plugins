@@ -25,10 +25,10 @@ async def handle_translation(content: str) -> str:
             sl = detect(content)
             if sl == "zh-cn" or sl == "zh-tw":
                 sl = "zh"
-            dltext = "\nDeepL翻译：" + deepl.translate(
+            dltext = "\nDeepL翻译：\n" + deepl.translate(
                 source_language=sl, target_language="ZH", text=content
             )
-            return dltext
+            return dltext + "\n"
     except Exception as e:
         logger.error(e)
     translator = google_translator()

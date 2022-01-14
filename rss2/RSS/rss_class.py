@@ -1,12 +1,11 @@
 import re
+from pathlib import Path
 
 from nonebot.log import logger
-from pathlib import Path
-from tinydb import TinyDB, Query
+from tinydb import Query, TinyDB
 from tinydb.operations import set
 
-from ..config import config
-from ..config import DATA_PATH, JSON_PATH
+from ..config import DATA_PATH, JSON_PATH, config
 
 
 class Rss:
@@ -50,7 +49,11 @@ class Rss:
             return []
         rss_list = []
         db = TinyDB(
-            JSON_PATH, encoding="utf-8", sort_keys=True, indent=4, ensure_ascii=False,
+            JSON_PATH,
+            encoding="utf-8",
+            sort_keys=True,
+            indent=4,
+            ensure_ascii=False,
         )
         for rss in db.all():
             tmp_rss = Rss()
@@ -81,7 +84,11 @@ class Rss:
                 return
             self.group_id.append(str(group))
         db = TinyDB(
-            JSON_PATH, encoding="utf-8", sort_keys=True, indent=4, ensure_ascii=False,
+            JSON_PATH,
+            encoding="utf-8",
+            sort_keys=True,
+            indent=4,
+            ensure_ascii=False,
         )
         db.upsert(self.__dict__, Query().name == self.name)
 
@@ -91,7 +98,11 @@ class Rss:
             return False
         self.group_id.remove(str(group))
         db = TinyDB(
-            JSON_PATH, encoding="utf-8", sort_keys=True, indent=4, ensure_ascii=False,
+            JSON_PATH,
+            encoding="utf-8",
+            sort_keys=True,
+            indent=4,
+            ensure_ascii=False,
         )
         db.update(set("group_id", self.group_id), Query().name == self.name)
         return True
@@ -99,7 +110,11 @@ class Rss:
     # 删除整个订阅
     def delete_rss(self):
         db = TinyDB(
-            JSON_PATH, encoding="utf-8", sort_keys=True, indent=4, ensure_ascii=False,
+            JSON_PATH,
+            encoding="utf-8",
+            sort_keys=True,
+            indent=4,
+            ensure_ascii=False,
         )
         db.remove(Query().name == self.name)
         self.delete_file()

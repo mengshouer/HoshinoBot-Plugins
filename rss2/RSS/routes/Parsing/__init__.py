@@ -1,36 +1,33 @@
-import arrow
 import difflib
 import re
 import sqlite3
-
 from email.utils import parsedate_to_datetime
+from typing import Dict, List
+
+import arrow
 from nonebot import logger
 from pyquery import PyQuery as Pq
 from tinydb import TinyDB
 from tinydb.middlewares import CachingMiddleware
 from tinydb.storages import JSONStorage
-from typing import List, Dict
 
+from ....config import DATA_PATH, config
+from ....RSS.rss_class import Rss
 from .cache_manage import (
     cache_db_manage,
+    cache_filter,
     cache_json_manage,
     duplicate_exists,
     insert_into_cache_db,
 )
-from .cache_manage import cache_filter
 from .check_update import check_update
 from .download_torrent import down_torrent
-from .handle_html_tag import handle_bbcode
-from .handle_html_tag import handle_html_tag
+from .handle_html_tag import handle_bbcode, handle_html_tag
 from .handle_images import handle_img
 from .handle_translation import handle_translation
 from .send_message import send_msg
-from .utils import get_proxy
-from .utils import get_summary
+from .utils import get_proxy, get_summary
 from .write_rss_data import write_item
-from ....RSS.rss_class import Rss
-from ....config import config
-from ....config import DATA_PATH
 
 
 # 订阅器启动的时候将解析器注册到rss实例类？，避免每次推送时再匹配
@@ -203,7 +200,10 @@ class ParsingRss:
 
         # 分条处理
         self.state.update(
-            {"messages": [], "item_count": 0,}
+            {
+                "messages": [],
+                "item_count": 0,
+            }
         )
         for item in self.state.get("change_data"):
             item_msg = f"【{self.state.get('rss_title')}】更新了!\n----------------------\n"
@@ -302,7 +302,10 @@ async def handle_check_update(rss: Rss, state: dict):
     delete = []
     for index, item in enumerate(change_data):
         is_duplicate, image_hash = await duplicate_exists(
-            rss=rss, conn=conn, item=item, summary=get_summary(item),
+            rss=rss,
+            conn=conn,
+            item=item,
+            summary=get_summary(item),
         )
         if is_duplicate:
             write_item(db, item)
@@ -416,7 +419,9 @@ async def handle_picture(
     res = ""
     try:
         res += await handle_img(
-            item=item, img_proxy=rss.img_proxy, img_num=rss.max_image_number,
+            item=item,
+            img_proxy=rss.img_proxy,
+            img_num=rss.max_image_number,
         )
     except Exception as e:
         logger.warning(f"{rss.name} 没有正文内容！{e}")

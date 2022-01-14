@@ -1,24 +1,24 @@
-import httpx
 import sqlite3
 
+import httpx
 from nonebot import logger
 from pyquery import PyQuery as Pq
-from tenacity import retry, stop_after_attempt, stop_after_delay, RetryError
+from tenacity import RetryError, retry, stop_after_attempt, stop_after_delay
 
+from ...config import DATA_PATH
+from ..rss_class import Rss
 from .Parsing import (
     ParsingBase,
-    get_proxy,
-    write_item,
     cache_db_manage,
     duplicate_exists,
+    get_proxy,
+    write_item,
 )
 from .Parsing.handle_images import (
-    handle_img_combo,
     get_preview_gif_from_video,
+    handle_img_combo,
     handle_img_combo_with_content,
 )
-from ..rss_class import Rss
-from ...config import DATA_PATH
 
 
 # 处理图片
@@ -32,7 +32,10 @@ async def handle_picture(
         return ""
 
     try:
-        res = await handle_img(item=item, img_proxy=rss.img_proxy,)
+        res = await handle_img(
+            item=item,
+            img_proxy=rss.img_proxy,
+        )
     except RetryError:
         res = "预览图获取失败"
         logger.warning(f"[{item['link']}]的预览图获取失败")
@@ -98,7 +101,10 @@ async def handle_check_update(rss: Rss, state: dict):
             logger.warning(f"[{item['link']}]的预览图获取失败")
             continue
         is_duplicate, image_hash = await duplicate_exists(
-            rss=rss, conn=conn, item=item, summary=summary,
+            rss=rss,
+            conn=conn,
+            item=item,
+            summary=summary,
         )
         if is_duplicate:
             write_item(db, item)

@@ -1,8 +1,8 @@
 import json
 import nonebot
 import asyncio
-from nonebot import logger
 
+from nonebot import logger
 from pathlib import Path
 from tinydb import TinyDB
 from tinydb.storages import JSONStorage

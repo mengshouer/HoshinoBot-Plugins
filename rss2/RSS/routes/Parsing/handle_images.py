@@ -1,16 +1,16 @@
 import base64
-import httpx
 import random
 import re
-
-from PIL import Image, UnidentifiedImageError
 from io import BytesIO
-from nonebot import logger
-from pyquery import PyQuery as Pq
-from tenacity import retry, stop_after_attempt, stop_after_delay, RetryError
 
-from .utils import get_proxy, get_summary
+import httpx
+from nonebot import logger
+from PIL import Image, UnidentifiedImageError
+from pyquery import PyQuery as Pq
+from tenacity import RetryError, retry, stop_after_attempt, stop_after_delay
+
 from ....config import config
+from .utils import get_proxy, get_summary
 
 STATUS_CODE = [200, 301, 302]
 
@@ -20,7 +20,8 @@ STATUS_CODE = [200, 301, 302]
 async def resize_gif(url: str, resize_ratio: int = 2) -> BytesIO:
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            url="https://s3.ezgif.com/resize", data={"new-image-url": url},
+            url="https://s3.ezgif.com/resize",
+            data={"new-image-url": url},
         )
         d = Pq(response.text)
         next_url = d("form").attr("action")
@@ -48,7 +49,8 @@ async def resize_gif(url: str, resize_ratio: int = 2) -> BytesIO:
 async def get_preview_gif_from_video(url: str) -> str:
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            url="https://s3.ezgif.com/video-to-gif", data={"new-image-url": url},
+            url="https://s3.ezgif.com/video-to-gif",
+            data={"new-image-url": url},
         )
         d = Pq(response.text)
         video_length = re.search(
