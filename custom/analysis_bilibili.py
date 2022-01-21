@@ -1,6 +1,7 @@
 import re
 import aiohttp
 import time
+import urllib.parse
 from hoshino import Service
 
 sv = Service("analysis_bilibili")
@@ -136,7 +137,7 @@ async def search_bilibili_video_by_title(bot, ev):
 
 async def search_bili_by_title(title: str):
     search_url = (
-        f"http://api.bilibili.com/x/web-interface/search/all/v2?keyword={title}"
+        f"http://api.bilibili.com/x/web-interface/search/all/v2?keyword={urllib.parse.quote(title)}"
     )
 
     async with aiohttp.request(
