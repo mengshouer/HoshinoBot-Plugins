@@ -1,8 +1,6 @@
 import re
-import json
 import aiohttp
-import asyncio
-from datetime import datetime
+import time
 from hoshino import Service
 
 sv = Service("analysis_bilibili")
@@ -164,7 +162,9 @@ async def video_detail(url):
             res = res["data"]
         vurl = f"https://www.bilibili.com/video/av{res['aid']}\n"
         title = f"标题：{res['title']}\n"
-        up = f"UP主：{res['owner']['name']} (https://space.bilibili.com/{res['owner']['mid']})\n"
+        tname = f"类型：{res['tname']} | UP：{res['owner']['name']}\n"
+        stat = f"播放：{res['stat']['view']} | 弹幕：{res['stat']['danmaku']} | 收藏：{res['stat']['favorite']}\n"
+        stat += f"点赞：{res['stat']['like']} | 硬币：{res['stat']['coin']} | 评论：{res['stat']['reply']}\n"
         desc = f"简介：{res['desc']}"
         desc_list = desc.split("\n")
         desc = ""
@@ -174,7 +174,7 @@ async def video_detail(url):
         desc_list = desc.split("\n")
         if len(desc_list) > 4:
             desc = desc_list[0] + "\n" + desc_list[1] + "\n" + desc_list[2] + "……"
-        msg = str(vurl) + str(title) + str(up) + str(desc)
+        msg = str(vurl) + str(title) + str(tname) + str(stat) + str(desc)
         return msg, vurl
     except Exception as e:
         msg = "视频解析出错--Error: {}".format(type(e))
@@ -233,7 +233,7 @@ async def live_detail(url):
         vurl = f"https://live.bilibili.com/{room_id}\n"
         if lock_status:
             lock_time = res["data"]["room_info"]["lock_time"]
-            lock_time = datetime.fromtimestamp(lock_time).strftime("%Y-%m-%d %H:%M:%S")
+            lock_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(lock_time))
             title = f"[已封禁]直播间封禁至：{lock_time}\n"
         elif live_status == 1:
             title = f"[直播中]标题：{title}\n"
