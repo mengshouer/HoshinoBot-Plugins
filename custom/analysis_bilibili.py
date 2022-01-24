@@ -15,7 +15,7 @@ async def rex_bilibili(bot, ev):
     if re.search(r"(b23.tv)|(bili(22|23|33|2233).cn)", text, re.I):
         # 提前处理短链接，避免解析到其他的
         text = await b23_extract(text)
-    patterns = r"(live.bilibili.com)|(bilibili.com/(video|read|bangumi))|(^(av|cv)(\d+))|(^BV([a-zA-Z0-9]{10})+)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)|(QQ小程序&#93;哔哩哔哩)"
+    patterns = r"(live.bilibili.com/(blanc/|h5/)?(\d+))|(bilibili.com/(video|read|bangumi))|(^(av|cv)(\d+))|((^|bvid=)BV([a-zA-Z0-9]{10})+)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)|(QQ小程序&#93;哔哩哔哩)"
     match = re.compile(patterns, re.I).search(text)
     if match:
         group_id = ev.group_id
@@ -167,7 +167,7 @@ async def video_detail(url, page):
             p = int(page[len("?p=") :])
             if p <= len(res["pages"]):
                 vurl += page + ""
-                title += f"小标题：{res['pages'][p]['part']}\n"
+                title += f"小标题：{res['pages'][p-1]['part']}\n"
         tname = f"类型：{res['tname']} | UP：{res['owner']['name']}\n"
         stat = f"播放：{res['stat']['view']} | 弹幕：{res['stat']['danmaku']} | 收藏：{res['stat']['favorite']}\n"
         stat += f"点赞：{res['stat']['like']} | 硬币：{res['stat']['coin']} | 评论：{res['stat']['reply']}\n"
