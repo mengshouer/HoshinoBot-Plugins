@@ -8,7 +8,7 @@ sv = Service("analysis_bilibili")
 
 analysis_stat = {}  # analysis_stat: video_url(vurl)
 
-
+# on_rex判断不到小程序信息
 @sv.on_message("group")
 async def rex_bilibili(bot, ev):
     text = str(ev.message).strip()
@@ -88,7 +88,7 @@ async def b23_extract(text):
 
 async def extract(text: str):
     try:
-        page = re.compile(r"\?p=\d+", re.I).search(text)
+        page = re.compile(r"\?p=\d+").search(text)
         aid = re.compile(r"av\d+", re.I).search(text)
         bvid = re.compile(r"BV([a-zA-Z0-9]{10})+", re.I).search(text)
         epid = re.compile(r"ep\d+", re.I).search(text)
