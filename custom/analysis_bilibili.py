@@ -52,7 +52,7 @@ async def bili_keyword(group_id, text):
                     break
 
         # 获取视频详细信息
-        if "view" in url:
+        if "view?" in url:
             msg, vurl = await video_detail(url, page)
         elif "bangumi" in url:
             msg, vurl = await bangumi_detail(url)
