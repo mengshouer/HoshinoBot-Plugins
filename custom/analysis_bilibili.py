@@ -2,6 +2,7 @@ import re
 import aiohttp
 import time
 import urllib.parse
+import json
 from hoshino import Service
 
 sv = Service("analysis_bilibili")
@@ -9,13 +10,13 @@ sv = Service("analysis_bilibili")
 analysis_stat = {}  # analysis_stat: video_url(vurl)
 
 # on_rex判断不到小程序信息
-@sv.on_message("group")
+@sv.on_message()
 async def rex_bilibili(bot, ev):
     text = str(ev.message).strip()
     if re.search(r"(b23.tv)|(bili(22|23|33|2233).cn)", text, re.I):
         # 提前处理短链接，避免解析到其他的
         text = await b23_extract(text)
-    patterns = r"(live.bilibili.com/(blanc/|h5/)?(\d+))|(bilibili.com/(video|read|bangumi))|(^(av|cv)(\d+))|((^|bvid=)BV([a-zA-Z0-9]{10})+)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)|(QQ小程序&#93;哔哩哔哩)"
+    patterns = r"((live|t).bilibili.com/(blanc/|h5/)?(\d+))|bilibili.com/(video|read|bangumi))|(^(av|cv)(\d+))|((^|bvid=)BV([a-zA-Z0-9]{10})+)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)|(QQ小程序&#93;哔哩哔哩)"
     match = re.compile(patterns, re.I).search(text)
     if match:
         group_id = ev.group_id
@@ -51,14 +52,16 @@ async def bili_keyword(group_id, text):
                     break
 
         # 获取视频详细信息
-        if "bangumi" in url:
+        if "view" in url:
+            msg, vurl = await video_detail(url, page)
+        elif "bangumi" in url:
             msg, vurl = await bangumi_detail(url)
-        elif "live.bilibili.com" in url:
+        elif "xlive" in url:
             msg, vurl = await live_detail(url)
         elif "article" in url:
             msg, vurl = await article_detail(url)
         else:
-            msg, vurl = await video_detail(url, page)
+            msg, vurl = await dynamic_detail(url)
 
         # 避免多个机器人解析重复推送
         if group_id not in analysis_stat:
@@ -98,6 +101,7 @@ async def extract(text: str):
         cvid = re.compile(r"(cv|/read/(mobile|native)(/|\?id=))(\d+)", re.I).search(
             text
         )
+        dynamic_id = re.compile(r"t.bilibili.com/(\d+)", re.I).search(text)
         if bvid:
             url = f"https://api.bilibili.com/x/web-interface/view?bvid={bvid[0]}"
         elif aid:
@@ -114,6 +118,8 @@ async def extract(text: str):
             url = f"https://api.live.bilibili.com/xlive/web-room/v1/index/getInfoByRoom?room_id={room_id[2]}"
         elif cvid:
             url = f"https://api.bilibili.com/x/article/viewinfo?id={cvid[4]}&mobi_app=pc&from=web"
+        elif dynamic_id:
+            url = f"https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/get_dynamic_detail?dynamic_id={dynamic_id[1]}"
         return url, page
     except:
         return None, None
@@ -167,7 +173,7 @@ async def video_detail(url, page):
             p = int(page[len("?p=") :])
             if p <= len(res["pages"]):
                 vurl += page + ""
-                part = res['pages'][p-1]['part']
+                part = res["pages"][p - 1]["part"]
                 if part != res["title"]:
                     title += f"小标题：{part}\n"
         tname = f"类型：{res['tname']} | UP：{res['owner']['name']}\n"
@@ -295,4 +301,41 @@ async def article_detail(url):
         return msg, vurl
     except Exception as e:
         msg = "专栏解析出错--Error: {}".format(type(e))
+        return msg, None
+
+
+async def dynamic_detail(url):
+    try:
+        async with aiohttp.request(
+            "GET", url, timeout=aiohttp.client.ClientTimeout(10)
+        ) as resp:
+            res = await resp.json()
+            res = res["data"]["card"]
+        card = json.loads(res["card"])
+        dynamic_id = res["desc"]["dynamic_id"]
+        vurl = f"https://t.bilibili.com/{dynamic_id}\n"
+        item = card.get("item")
+        if not item:
+            return "动态不存在文字内容", vurl
+        content = item.get("description")
+        if not content:
+            content = item.get("content")
+        content = content.replace("\r", "\n")
+        if len(content) > 250:
+            content = content[:250] + "......"
+        pics = item.get("pictures")
+        if pics:
+            content += f"\nPS：动态中包含{len(pics)}张图片"
+        origin = card.get("origin")
+        if origin:
+            jorigin = json.loads(origin)
+            short_link = jorigin.get("short_link")
+            if short_link:
+                content += f"\n动态包含转发视频{short_link}"
+            else:
+                content += f"\n动态包含转发其他动态"
+        msg = str(vurl) + str(content)
+        return msg, vurl
+    except Exception as e:
+        msg = "动态解析出错--Error: {}".format(type(e))
         return msg, None
