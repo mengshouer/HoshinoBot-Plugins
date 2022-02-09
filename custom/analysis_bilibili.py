@@ -42,13 +42,13 @@ async def bili_keyword(group_id, text):
             i = 0
             while i < len(desc):
                 title_dict = "{" + desc[i] + "}"
-                title = eval(title_dict)
+                title = json.loads(title_dict)
                 i += 1
                 if title["desc"] == "哔哩哔哩":
                     continue
                 vurl = await search_bili_by_title(title["desc"])
                 if vurl:
-                    url = await extract(vurl)
+                    url, page = await extract(vurl)
                     break
 
         # 获取视频详细信息
