@@ -6,6 +6,22 @@ import json
 from hoshino import Service
 
 sv = Service("analysis_bilibili")
+sv2 = Service("search_bilibili_video")
+
+
+@sv2.on_prefix("搜视频")
+async def search_bilibili_video_by_title(bot, ev):
+    title = ev.message.extract_plain_text()
+    vurl = await search_bili_by_title(title)
+    msg = await bili_keyword(ev.group_id, vurl)
+    try:
+        await bot.send(ev, msg)
+    except:
+        # 避免简介有风控内容无法发送
+        await bot.send(ev, "此次解析可能被风控，尝试去除简介后发送！")
+        msg = re.sub(r"简介.*", "", msg)
+        await bot.send(ev, msg)
+
 
 analysis_stat = {}  # analysis_stat: video_url(vurl)
 
@@ -59,16 +75,15 @@ async def bili_keyword(group_id, text):
         elif "xlive" in url:
             msg, vurl = await live_detail(url)
         elif "article" in url:
-            msg, vurl = await article_detail(url)
+            msg, vurl = await article_detail(url, page)
         else:
             msg, vurl = await dynamic_detail(url)
 
         # 避免多个机器人解析重复推送
-        if group_id not in analysis_stat:
-            analysis_stat[group_id] = vurl
-            last_vurl = ""
-        else:
-            last_vurl = analysis_stat[group_id]
+        last_vurl = ""
+        if group_id:
+            if group_id in analysis_stat:
+                last_vurl = analysis_stat[group_id]
             analysis_stat[group_id] = vurl
         if last_vurl == vurl:
             return
@@ -93,7 +108,7 @@ async def extract(text: str):
     try:
         page = re.compile(r"\?p=\d+").search(text)
         aid = re.compile(r"av\d+", re.I).search(text)
-        bvid = re.compile(r"BV([a-zA-Z0-9]{10})+", re.I).search(text)
+        bvid = re.compile(r"BV([A-Za-z0-9]{10})+", re.I).search(text)
         epid = re.compile(r"ep\d+", re.I).search(text)
         ssid = re.compile(r"ss\d+", re.I).search(text)
         mdid = re.compile(r"md\d+", re.I).search(text)
@@ -120,35 +135,19 @@ async def extract(text: str):
         elif room_id:
             url = f"https://api.live.bilibili.com/xlive/web-room/v1/index/getInfoByRoom?room_id={room_id[2]}"
         elif cvid:
-            url = f"https://api.bilibili.com/x/article/viewinfo?id={cvid[4]}&mobi_app=pc&from=web"
+            page = cvid[4]
+            url = f"https://api.bilibili.com/x/article/viewinfo?id={page}&mobi_app=pc&from=web"
         elif dynamic_id_type2:
             url = f"https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/get_dynamic_detail?rid={dynamic_id_type2[2]}&type=2"
         elif dynamic_id:
             url = f"https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/get_dynamic_detail?dynamic_id={dynamic_id[2]}"
         return url, page
-    except:
+    except Exception:
         return None, None
 
 
-sv2 = Service("search_bilibili_video")
-
-
-@sv2.on_prefix("搜视频")
-async def search_bilibili_video_by_title(bot, ev):
-    title = ev.message.extract_plain_text()
-    vurl = await search_bili_by_title(title)
-    msg = await bili_keyword(ev.group_id, vurl)
-    try:
-        await bot.send(ev, msg)
-    except:
-        # 避免简介有风控内容无法发送
-        await bot.send(ev, "此次解析可能被风控，尝试去除简介后发送！")
-        msg = re.sub(r"简介.*", "", msg)
-        await bot.send(ev, msg)
-
-
 async def search_bili_by_title(title: str):
-    search_url = f"http://api.bilibili.com/x/web-interface/search/all/v2?keyword={urllib.parse.quote(title)}"
+    search_url = f"https://api.bilibili.com/x/web-interface/search/all/v2?keyword={urllib.parse.quote(title)}"
 
     async with aiohttp.request(
         "GET", search_url, timeout=aiohttp.client.ClientTimeout(10)
@@ -284,14 +283,13 @@ async def live_detail(url):
         return msg, None
 
 
-async def article_detail(url):
+async def article_detail(url, cvid):
     try:
         async with aiohttp.request(
             "GET", url, timeout=aiohttp.client.ClientTimeout(10)
         ) as resp:
             res = await resp.json()
             res = res["data"]
-        cvid = re.compile(r"id=(\d+)").search(url).group(1)
         vurl = f"https://www.bilibili.com/read/cv{cvid}\n"
         title = f"标题：{res['title']}\n"
         up = f"作者：{res['author_name']} (https://space.bilibili.com/{res['mid']})\n"
@@ -328,9 +326,9 @@ async def dynamic_detail(url):
         content = content.replace("\r", "\n")
         if len(content) > 250:
             content = content[:250] + "......"
-        pics = item.get("pictures")
+        pics = item.get("pictures_count")
         if pics:
-            content += f"\nPS：动态中包含{len(pics)}张图片"
+            content += f"\nPS：动态中包含{pics}张图片"
         origin = card.get("origin")
         if origin:
             jorigin = json.loads(origin)
