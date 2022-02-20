@@ -1,19 +1,33 @@
 from nonebot import on_command, CommandSession
-from nonebot.permission import *
 
 from .RSS import my_trigger as tr
 from .RSS import rss_class
+from .permission import admin_permission
+
+prompt = """\
+请输入
+    名称 [订阅地址]
+空格分割、[]表示可选
+私聊默认订阅到当前账号，群聊默认订阅到当前群组
+更多信息可通过 change 命令修改\
+"""
 
 
-@on_command("add", aliases=("添加订阅", "sub"), permission=GROUP_ADMIN | SUPERUSER)
+@on_command(
+    "add",
+    aliases=("添加订阅", "sub"),
+    permission=admin_permission,
+    only_to_me=False,
+)
 async def add(session: CommandSession):
     user_id = session.ctx["user_id"]
     group_id = session.ctx.get("group_id")
+    guild_channel_id = session.ctx.get("guild_id")
+    if guild_channel_id:
+        group_id = None
+        guild_channel_id = guild_channel_id + "@" + session.ctx.get("channel_id")
 
-    rss_dy_link = session.get(
-        "add",
-        prompt="请输入\n名称 [订阅地址]\n空格分割、[]表示可选\n私聊默认订阅到当前账号，群聊默认订阅到当前群组\n更多信息可通过 change 命令修改\nhttps://github.com/Quan666/ELF_RSS/wiki/%E4%BD%BF%E7%94%A8%E6%95%99%E7%A8%8B",
-    )
+    rss_dy_link = session.get("add", prompt=prompt)
 
     dy = rss_dy_link.split(" ")
 
@@ -25,45 +39,32 @@ async def add(session: CommandSession):
         await session.send("❌ 输入的订阅名为空！")
         return
 
-    async def add_group_or_user(_group_id, _user_id):
+    async def add_group_or_user(_rss, _group_id, _user_id, _guild_channel_id):
         if _group_id:
-            rss.add_user_or_group(group=str(_group_id))
-            await tr.add_job(rss)
-            await session.send("👏 订阅到当前群组成功！")
+            _rss.add_user_or_group(group=str(_group_id))
+            await tr.add_job(_rss)
+            await session.finish("👏 订阅到当前群组成功！")
+        elif _guild_channel_id:
+            _rss.add_user_or_group(guild_channel=_guild_channel_id)
+            await tr.add_job(_rss)
+            await session.finish("👏 订阅到当前子频道成功！")
         else:
-            rss.add_user_or_group(user=_user_id)
-            await tr.add_job(rss)
-            await session.send("👏 订阅到当前账号成功！")
+            _rss.add_user_or_group(user=_user_id)
+            await tr.add_job(_rss)
+            await session.finish("👏 订阅到当前账号成功！")
 
-    if rss.find_name(name=name):
-        rss = rss.find_name(name=name)
-        await add_group_or_user(group_id, user_id)
-        return
-
-    try:
-        url = dy[1]
-    except IndexError:
-        await session.send("❌ 输入的订阅地址为空！")
-        return
-
-    # 去除判断，订阅链接不再唯一，可不同名同链接
-    # # 判断当前订阅地址存在否
-    # if rss.findURL(url=url):
-    #     rss = rss.findURL(url=url)
-    #     if group_id:
-    #         rss.add_group(group=group_id)
-    #         await tr.add_job(rss)
-    #         await session.send('当前订阅地址已存在，将 {} 订阅到当前群组成功！'.format(rss.name))
-    #     else:
-    #         rss.add_user(user=user_id)
-    #         await tr.add_job(rss)
-    #         await session.send('当前订阅地址已存在，将 {} 订阅到当前账号成功！'.format(rss.name))
-    #     return
-
-    # 当前名称、url都不存在
-    rss.name = name
-    rss.url = url
-    await add_group_or_user(group_id, user_id)
+    # # 判断是否有该名称订阅，有就将当前qq或群加入订阅
+    rss_tmp = rss.find_name(name=name)
+    if rss_tmp is not None:
+        await add_group_or_user(rss_tmp, group_id, user_id, guild_channel_id)
+    else:
+        rss.name = name
+        try:
+            url = dy[1]
+        except IndexError:
+            await session.finish("❌ 输入的订阅地址为空！")
+        rss.url = url
+        await add_group_or_user(rss, group_id, user_id, guild_channel_id)
 
 
 # add.args_parser 装饰器将函数声明为 add 命令的参数解析器

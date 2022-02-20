@@ -1,50 +1,55 @@
 from nonebot import on_command, CommandSession
-from nonebot.permission import *
+from .permission import admin_permission
 from .RSS import my_trigger as tr
 from .RSS import rss_class
 
+prompt = """\
+请输入：
+    名称 cookies
+空格分割
 
-@on_command("addcookies", aliases=("添加cookies"), permission=GROUP_ADMIN | SUPERUSER)
-async def addcookies(session: CommandSession):
-    rss_cookies = session.get(
-        "addcookies",
-        prompt="请输入\n名称 cookies\n空格分割\n获取方式：\nPC端 chrome 浏览器按 F12\n找到Consle选项卡，输入:\ndocument.cookie\n输出的字符串就是了",
-    )
+获取方式：
+    PC端 Chrome 浏览器按 F12
+    找到Console选项卡，输入:
+        document.cookie
+    输出的字符串就是了\
+"""
+
+
+@on_command(
+    "add_cookies", aliases=("添加cookies"), permission=admin_permission, only_to_me=False
+)
+async def add_cookies(session: CommandSession):
+    rss_cookies = session.get("add_cookies", prompt=prompt)
 
     dy = rss_cookies.split(" ", 1)
 
-    rss = rss_class.Rss(name="", url="", user_id="-1", group_id="-1")
+    rss = rss_class.Rss()
     # 判断是否有该名称订阅
     try:
         name = dy[0]
     except IndexError:
-        await session.send("❌ 输入的订阅名为空！")
-        return
+        await session.finish("❌ 输入的订阅名为空！")
 
-    if not rss.find_name(name=name):
-        await session.send("❌ 不存在该订阅: {}".format(name))
-        return
     rss = rss.find_name(name=name)
 
-    try:
-        cookies = dy[1]
-    except IndexError:
-        await session.send("❌ 输入的cookies为空！")
-        return
-
-    rss.name = name
-    if rss.set_cookies(cookies):
-        await tr.add_job(rss)
-        await session.send(
-            "👏 {}的Cookies添加成功！\nCookies:{}\n".format(rss.name, rss.cookies)
-        )
+    if rss is None:
+        await session.finish(f"❌ 不存在该订阅: {name}")
     else:
-        await session.send(
-            "👏 {}的Cookies添加失败！\nCookies:{}\n".format(rss.name, rss.cookies)
-        )
+        try:
+            cookies = dy[1]
+        except IndexError:
+            await session.finish("❌ 输入的cookies为空！")
+
+        rss.name = name
+        if rss.set_cookies(cookies):
+            await tr.add_job(rss)
+            await session.finish(f"👏 {rss.name}的Cookies添加成功！\nCookies:{rss.cookies}\n")
+        else:
+            await session.finish(f"❌ {rss.name}的Cookies添加失败！\nCookies:{rss.cookies}\n")
 
 
-@addcookies.args_parser
+@add_cookies.args_parser
 async def _(session: CommandSession):
     # 去掉消息首尾的空白符
     stripped_arg = session.current_arg_text.strip()

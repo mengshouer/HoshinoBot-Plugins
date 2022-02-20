@@ -1,7 +1,7 @@
 import copy
 
 from nonebot import on_command, CommandSession
-from nonebot.permission import *
+from .permission import admin_permission
 
 from .RSS import rss_class
 
@@ -21,9 +21,8 @@ async def handle_rss_list(rss_list: list) -> str:
     return msg_str
 
 
-# 不带订阅名称默认展示当前群组或账号的订阅
-# 带订阅名称就显示该订阅的
-@on_command("show", aliases=("查看订阅"), permission=GROUP_ADMIN | SUPERUSER)
+# 不带订阅名称默认展示当前群组或账号的订阅，带订阅名称就显示该订阅的
+@on_command("show", aliases=("查看订阅"), permission=admin_permission, only_to_me=False)
 async def rssShow(session: CommandSession):
     args = session.current_arg.strip()
     if args:
@@ -33,36 +32,52 @@ async def rssShow(session: CommandSession):
 
     user_id = session.ctx["user_id"]
     group_id = session.ctx.get("group_id")
+    guild_channel_id = session.ctx.get("guild_id")
+    if guild_channel_id:
+        group_id = None
+        guild_channel_id = guild_channel_id + "@" + session.ctx.get("channel_id")
 
     rss = rss_class.Rss()
+
     if rss_name:
         rss = rss.find_name(rss_name)
-        if not rss:
-            await session.send(f"❌ 订阅 {rss_name} 不存在！")
-            return
-        rss_msg = str(rss)
-        if group_id:
-            # 隐私考虑，群组下不展示除当前群组外的群号和QQ
-            if not str(group_id) in rss.group_id:
-                await session.send(f"❌ 当前群组未订阅 {rss_name} ")
-                return
-            rss_tmp = copy.deepcopy(rss)
-            rss_tmp.group_id = [str(group_id), "*"]
-            rss_tmp.user_id = ["*"]
-            rss_msg = str(rss_tmp)
-        await session.send(rss_msg)
-        return
+        if rss is None:
+            await session.finish(f"❌ 订阅 {rss_name} 不存在！")
+        else:
+            rss_msg = str(rss)
+            if group_id:
+                # 隐私考虑，不展示除当前群组外的订阅
+                if not str(group_id) in rss.group_id:
+                    await session.finish(f"❌ 当前群组未订阅 {rss_name} ")
+                rss_tmp = copy.deepcopy(rss)
+                rss_tmp.guild_channel_id = ["*"]
+                rss_tmp.group_id = [str(group_id), "*"]
+                rss_tmp.user_id = ["*"]
+                rss_msg = str(rss_tmp)
+            elif guild_channel_id:
+                # 隐私考虑，不展示除当前子频道外的订阅
+                if not str(guild_channel_id) in rss.guild_channel_id:
+                    await session.finish(f"❌ 当前群组未订阅 {rss_name} ")
+                rss_tmp = copy.deepcopy(rss)
+                rss_tmp.guild_channel_id = [str(guild_channel_id), "*"]
+                rss_tmp.group_id = ["*"]
+                rss_tmp.user_id = ["*"]
+                rss_msg = str(rss_tmp)
+            await session.finish(rss_msg)
 
     if group_id:
         rss_list = rss.find_group(group=str(group_id))
         if not rss_list:
-            await session.send("❌ 当前群组没有任何订阅！")
-            return
+            await session.finish("❌ 当前群组没有任何订阅！")
+    elif guild_channel_id:
+        rss_list = rss.find_guild_channel(guild_channel=str(guild_channel_id))
+        if not rss_list:
+            await session.finish("❌ 当前子频道没有任何订阅！")
     else:
         rss_list = rss.find_user(user=user_id)
 
     if rss_list:
         msg_str = await handle_rss_list(rss_list)
-        await session.send(msg_str)
+        await session.finish(msg_str)
     else:
-        await session.send("❌ 当前没有任何订阅！")
+        await session.finish("❌ 当前没有任何订阅！")

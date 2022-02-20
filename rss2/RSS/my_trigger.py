@@ -25,8 +25,8 @@ async def delete_job(rss: rss_class.Rss):
 
 async def add_job(rss: rss_class.Rss):
     await delete_job(rss)
-    # 加入订阅任务队列,加入前判断是否存在群组或用户，二者不能同时为空
-    if len(rss.user_id) > 0 or len(rss.group_id) > 0:
+    # 加入订阅任务队列,加入前判断是否存在子频道或群组或用户，三者不能同时为空
+    if len(rss.user_id) > 0 or len(rss.group_id) > 0 or len(rss.guild_channel_id) > 0:
         rss_trigger(rss)
 
 
@@ -35,7 +35,9 @@ def rss_trigger(rss: rss_class.Rss):
         my_trigger_cron(rss)
         return
     # 制作一个“time分钟/次”触发器
-    trigger = IntervalTrigger(minutes=int(rss.time), jitter=10)
+    trigger = IntervalTrigger(
+        minutes=int(rss.time), jitter=10, timezone=scheduler.timezone
+    )
     # 添加任务
     scheduler.add_job(
         func=check_update,  # 要添加任务的函数，不要带参数

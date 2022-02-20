@@ -2,42 +2,50 @@ import copy
 import re
 
 from nonebot import on_command, CommandSession
-from nonebot.permission import *
+from .permission import admin_permission
 from nonebot.log import logger
 from tinydb import TinyDB, Query
-from typing import List
+from typing import List, Union
 
 from .RSS import my_trigger as tr
 from .RSS import rss_class
 from .config import DATA_PATH, JSON_PATH
 
-helpmsg = '''请输入要修改的订阅
-订阅名[,订阅名,...] 属性=值[ 属性=值 ...]
+prompt = """\
+请输入要修改的订阅
+    订阅名[,订阅名,...] 属性=值[ 属性=值 ...]
 如:
-test1[,test2,...] qq=,123,234 qun=-1
+    test1[,test2,...] qq=,123,234 qun=-1
 对应参数:
-订阅名-name 禁止将多个订阅批量改名，会因为名称相同起冲突
-订阅链接-url QQ-qq 群-qun 更新频率-time
-代理-proxy 翻译-tl 仅title-ot，仅图片-op，仅含有图片-ohp
-下载种子-downopen 白名单关键词-wkey 黑名单关键词-bkey 种子上传到群-upgroup
-去重模式-mode
-图片数量限制-img_num 只发送限定数量的图片，防止刷屏
-正文待移除内容-rm_list 从正文中要移除的指定内容，支持正则
-停止更新-stop
+    订阅名(-name): 禁止将多个订阅批量改名，名称相同会冲突
+    订阅链接(-url)
+    QQ(-qq) 
+    群(-qun)
+    更新频率(-time)
+    代理(-proxy) 
+    翻译(-tl)
+    仅Title(ot)
+    仅图片(-op)
+    仅含图片(-ohp)
+    下载种子(-downopen)
+    白名单关键词(-wkey)
+    黑名单关键词(-bkey)
+    种子上传到群(-upgroup)
+    去重模式(-mode)
+    图片数量限制(-img_num): 只发送限定数量的图片，防止刷屏
+    正文移除内容(-rm_list): 从正文中移除指定内容，支持正则
+    停止更新-stop"
 注：
-仅含有图片不同于仅图片，除了图片还会发送正文中的其他文本信息
-proxy、tl、ot、op、ohp、downopen、upgroup、stop 值为 1/0
-去重模式分为按链接(link)、标题(title)、图片(image)判断
-其中 image 模式，出于性能考虑以及避免误伤情况发生，生效对象限定为只带 1 张图片的消息，
-此外，如果属性中带有 or 说明判断逻辑是任一匹配即去重，默认为全匹配
-白名单关键词支持正则表达式，匹配时推送消息及下载，设为空(wkey=)时不生效
-黑名单关键词同白名单一样，只是匹配时不推送，两者可以一起用
-正文待移除内容因为参数解析的缘故，格式必须如：rm_list='a' 或 rm_list='a','b'
-该处理过程是在解析 html 标签后进行的
-要将该参数设为空使用 rm_list='-1'
-QQ、群号、去重模式前加英文逗号表示追加，-1设为空
-各个属性空格分割
-详细：https://oy.mk/cUm"'''.strip()
+    1. 仅含有图片不同于仅图片，除了图片还会发送正文中的其他文本信息
+    2. proxy/tl/ot/op/ohp/downopen/upgroup/stop 值为 1/0
+    3. 去重模式分为按链接(link)、标题(title)、图片(image)判断，其中 image 模式生效对象限定为只带 1 张图片的消息。如果属性中带有 or 说明判断逻辑是任一匹配即去重，默认为全匹配
+    4. 白名单关键词支持正则表达式，匹配时推送消息及下载，设为空(wkey=)时不生效
+    5. 黑名单关键词同白名单相似，匹配时不推送，两者可以一起用
+    6. 正文待移除内容格式必须如：rm_list='a' 或 rm_list='a','b'。该处理过程在解析 html 标签后进行，设为空使用 rm_list='-1'"
+    7. QQ、群号、去重模式前加英文逗号表示追加，-1设为空
+    8. 各个属性使用空格分割
+详细用法请查阅文档。\
+"""
 
 # 处理带多个值的订阅参数
 def handle_property(value: str, property_list: list) -> list:
@@ -58,6 +66,7 @@ attribute_dict = {
     "url": "url",
     "qq": "user_id",
     "qun": "group_id",
+    "channel": "guild_channel_id",
     "time": "time",
     "proxy": "img_proxy",
     "tl": "translation",
@@ -78,15 +87,23 @@ attribute_dict = {
 
 # 处理要修改的订阅参数
 async def handle_change_list(
-    rss: rss_class.Rss, key_to_change: str, value_to_change: str, group_id: int
+    rss: rss_class.Rss,
+    key_to_change: str,
+    value_to_change: str,
+    group_id: Union[int, None],
+    guild_channel_id: Union[str, None],
 ):
     if key_to_change == "name":
         await tr.delete_job(rss)
-        rss.rename_file(DATA_PATH / (value_to_change + ".json"))
-    elif (key_to_change in ["qq", "qun"] and not group_id) or key_to_change == "mode":
+        rss.rename_file(str(DATA_PATH / (value_to_change + ".json")))
+    elif (
+        key_to_change in ["qq", "qun", "channel"]
+        and not group_id
+        and not guild_channel_id
+    ) or key_to_change == "mode":
         value_to_change = handle_property(
             value_to_change, getattr(rss, attribute_dict[key_to_change])
-        )
+        )  # type:ignore
     elif key_to_change == "time":
         if not re.search(r"[_*/,-]", value_to_change):
             if int(float(value_to_change)) < 1:
@@ -103,15 +120,15 @@ async def handle_change_list(
         "downopen",
         "stop",
     ]:
-        value_to_change = bool(int(value_to_change))
+        value_to_change = bool(int(value_to_change))  # type:ignore
     elif (
         key_to_change in ["downkey", "wkey", "blackkey", "bkey"]
         and len(value_to_change.strip()) == 0
     ):
-        value_to_change = None
+        value_to_change = None  # type:ignore
     elif key_to_change == "img_num":
-        value_to_change = int(value_to_change)
-    setattr(rss, attribute_dict.get(key_to_change), value_to_change)
+        value_to_change = int(value_to_change)  # type:ignore
+    setattr(rss, attribute_dict.get(key_to_change), value_to_change)  # type:ignore
 
 
 # 参数特殊处理：正文待移除内容
@@ -139,29 +156,38 @@ async def handle_rm_list(rss_list: List[rss_class.Rss], change_info: str) -> lis
     return change_list
 
 
-@on_command("change", aliases=("修改订阅", "moddy"), permission=GROUP_ADMIN | SUPERUSER)
+@on_command(
+    "change", aliases=("修改订阅", "moddy"), permission=admin_permission, only_to_me=False
+)
 async def change(session: CommandSession):
-    change_info = session.get("change", prompt=helpmsg)
+    change_info = session.get("change", prompt=prompt)
     group_id = session.ctx.get("group_id")
-
+    guild_channel_id = session.ctx.get("guild_id")
+    if guild_channel_id:
+        group_id = None
+        guild_channel_id = guild_channel_id + "@" + session.ctx.get("channel_id")
     name_list = change_info.split(" ")[0].split(",")
     rss = rss_class.Rss()
     rss_list = [rss.find_name(name=name) for name in name_list]
     rss_list = [rss for rss in rss_list if rss]
 
     if group_id:
-        if re.search(" (qq|qun)=", change_info):
-            await session.send("❌ 禁止在群组中修改 QQ号 / 群号！如要取消订阅请使用 deldy 命令！")
-            return
+        if re.search(" (qq|qun|channel)=", change_info):
+            await session.finish("❌ 禁止在群组中修改订阅账号！如要取消订阅请使用 deldy 命令！")
         rss_list = [rss for rss in rss_list if str(group_id) in rss.group_id]
 
+    if guild_channel_id:
+        if re.search(" (qq|qun|channel)=", change_info):
+            await session.finish("❌ 禁止在子频道中修改订阅账号！如要取消订阅请使用 deldy 命令！")
+        rss_list = [
+            rss for rss in rss_list if str(guild_channel_id) in rss.guild_channel_id
+        ]
+    print(rss_list)
     if not rss_list:
-        await session.send("❌ 请检查是否存在以下问题：\n1.要修改的订阅名不存在对应的记录\n2.当前群组无权操作")
-        return
+        await session.finish("❌ 请检查是否存在以下问题：\n1.要修改的订阅名不存在对应的记录\n2.当前群组无权操作")
     else:
         if len(rss_list) > 1 and " name=" in change_info:
-            await session.send("❌ 禁止将多个订阅批量改名！会因为名称相同起冲突！")
-            return
+            await session.finish("❌ 禁止将多个订阅批量改名！会因为名称相同起冲突！")
 
     # 参数特殊处理：正文待移除内容
     change_list = await handle_rm_list(rss_list, change_info)
@@ -180,16 +206,20 @@ async def change(session: CommandSession):
                     set(value_to_change.split(",")) - mode_property_set
                     or value_to_change == "or"
                 ):
-                    await session.send(f"❌ 去重模式参数错误！\n{change_dict}")
-                    return
-                await handle_change_list(rss, key_to_change, value_to_change, group_id)
+                    await session.finish(f"❌ 去重模式参数错误！\n{change_dict}")
+                await handle_change_list(
+                    rss, key_to_change, value_to_change, group_id, guild_channel_id
+                )
             else:
-                await session.send(f"❌ 参数错误！\n{change_dict}")
-                return
+                await session.finish(f"❌ 参数错误！\n{change_dict}")
 
         # 参数解析完毕，写入
         db = TinyDB(
-            JSON_PATH, encoding="utf-8", sort_keys=True, indent=4, ensure_ascii=False,
+            JSON_PATH,
+            encoding="utf-8",
+            sort_keys=True,
+            indent=4,
+            ensure_ascii=False,
         )
         db.update(rss.__dict__, Query().name == str(rss_name))
 
@@ -201,10 +231,17 @@ async def change(session: CommandSession):
             logger.info(f"{rss.name} 已停止更新")
         rss_msg = str(rss)
 
-        if group_id:
-            # 隐私考虑，群组下不展示除当前群组外的群号和QQ
-            # 奇怪的逻辑，群管理能修改订阅消息，这对其他订阅者不公平。
+        # 隐私考虑，群组下不展示除当前群组外的群号和QQ
+        # 奇怪的逻辑，群管理能修改订阅消息，这对其他订阅者不公平。
+        if guild_channel_id:
             rss_tmp = copy.deepcopy(rss)
+            rss_tmp.guild_channel_id = [str(guild_channel_id), "*"]
+            rss_tmp.group_id = ["*"]
+            rss_tmp.user_id = ["*"]
+            rss_msg = str(rss_tmp)
+        elif group_id:
+            rss_tmp = copy.deepcopy(rss)
+            rss_tmp.guild_channel_id = ["*"]
             rss_tmp.group_id = [str(group_id), "*"]
             rss_tmp.user_id = ["*"]
             rss_msg = str(rss_tmp)
@@ -214,8 +251,7 @@ async def change(session: CommandSession):
     result_msg = f"修改了 {len(rss_msg_list)} 条订阅：\n{result_msg}" + result_msg.join(
         rss_msg_list
     )
-    await session.send(f"👏 修改成功\n{result_msg}")
-    logger.info(f"👏 修改成功\n{result_msg}")
+    await session.finish(f"👏 修改成功\n{result_msg}")
 
 
 @change.args_parser

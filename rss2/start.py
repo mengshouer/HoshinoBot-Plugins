@@ -115,6 +115,8 @@ async def start():
         raise
 
 
-@nonebot.scheduler.scheduled_job("date", misfire_grace_time=10)
+@nonebot.on_startup
 async def _():
-    await asyncio.gather(start(),)
+    await asyncio.gather(
+        start(),
+    )

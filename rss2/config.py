@@ -25,6 +25,12 @@ class config:
         [] if "rsshub_backup" not in cf else config.rsshub_backup
     )
 
+    # 配置 NoneBot 频道超级用户：管理员频道号，注意非qq号，可发送@后在gocq控制台获取
+    # 格式为["字符串"]
+    guild_superusers: List[str] = (
+        [] if "guild_superusers" not in cf else config.guild_superusers
+    )
+
     # 缓存rss条数
     limit = 500 if "limit" not in cf else config.limit
 
