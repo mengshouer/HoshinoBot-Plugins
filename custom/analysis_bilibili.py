@@ -32,7 +32,7 @@ async def rex_bilibili(bot, ev):
     if re.search(r"(b23.tv)|(bili(22|23|33|2233).cn)", text, re.I):
         # 提前处理短链接，避免解析到其他的
         text = await b23_extract(text)
-    patterns = r"((live|t|m).bilibili.com/(blanc/|h5/)?(\d+))|(bilibili.com/(video|read|bangumi))|(^(av|cv)(\d+))|((^|bvid=)BV([a-zA-Z0-9]{10})+)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)|(QQ小程序&#93;哔哩哔哩)"
+    patterns = r"(\.bilibili\.com)|(^(av|cv)(\d+))|(BV([a-zA-Z0-9]{10})+)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)|(QQ小程序&#93;哔哩哔哩)"
     match = re.compile(patterns, re.I).search(text)
     if match:
         group_id = ev.group_id
@@ -68,6 +68,7 @@ async def bili_keyword(group_id, text):
                     break
 
         # 获取视频详细信息
+        msg, vurl = "", ""
         if "view?" in url:
             msg, vurl = await video_detail(url, page)
         elif "bangumi" in url:
@@ -76,7 +77,7 @@ async def bili_keyword(group_id, text):
             msg, vurl = await live_detail(url)
         elif "article" in url:
             msg, vurl = await article_detail(url, page)
-        else:
+        elif "dynamic" in url:
             msg, vurl = await dynamic_detail(url)
 
         # 避免多个机器人解析重复推送
@@ -88,7 +89,7 @@ async def bili_keyword(group_id, text):
         if last_vurl == vurl:
             return
     except Exception as e:
-        msg = "Error: {}".format(type(e))
+        msg = "bili_keyword Error: {}".format(type(e))
     return msg
 
 
@@ -106,7 +107,8 @@ async def b23_extract(text):
 
 async def extract(text: str):
     try:
-        page = re.compile(r"\?p=\d+").search(text)
+        url = ""
+        page = re.compile(r"([?&]|&amp;)p=\d+").search(text)
         aid = re.compile(r"av\d+", re.I).search(text)
         bvid = re.compile(r"BV([A-Za-z0-9]{10})+", re.I).search(text)
         epid = re.compile(r"ep\d+", re.I).search(text)
@@ -143,7 +145,7 @@ async def extract(text: str):
             url = f"https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/get_dynamic_detail?dynamic_id={dynamic_id[2]}"
         return url, page
     except Exception:
-        return None, None
+        return "", None
 
 
 async def search_bili_by_title(title: str):
@@ -173,10 +175,10 @@ async def video_detail(url, page):
         vurl = f"https://www.bilibili.com/video/av{res['aid']}"
         title = f"\n标题：{res['title']}\n"
         if page:
-            page = page[0]
-            p = int(page[len("?p=") :])
+            page = page[0].replace("&amp;", "&")
+            p = int(page[3:])
             if p <= len(res["pages"]):
-                vurl += page + ""
+                vurl += f"?p={p}"
                 part = res["pages"][p - 1]["part"]
                 if part != res["title"]:
                     title += f"小标题：{part}\n"
