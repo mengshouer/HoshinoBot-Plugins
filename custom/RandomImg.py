@@ -1,6 +1,6 @@
 import os
 import random
-from hoshino import aiorequests, R, Service
+from hoshino import Service
 
 sv = Service("RIMG")  # 服务名
 rootdir = os.path.abspath(".")  # 根目录(运行run.py的目录)

@@ -1,19 +1,10 @@
+import nonebot
 from nonebot import on_request, RequestSession, on_command, CommandSession
 from nonebot.permission import SUPERUSER, check_permission
 
-try:
-    from hoshino import config
-
-    flag = 1
-except:
-    flag = 0
-
-if flag:
-    send_msg_user = config.SUPERUSERS[0]
-else:
-    # 消息提醒发送的用户，不填默认使用hoshino配置的第一个管理员
-    # 如果没有hoshino，必须修改下面的0为推送的QQ号
-    send_msg_user = 0
+flag = 0
+bot = nonebot.get_bot()
+send_msg_user = bot.config.SUPERUSERS[0]
 
 # 默认同意好友的群配置，如果申请的人在下列群里，默认同意好友请求
 allow_group = []  # [123, 234, 567]
