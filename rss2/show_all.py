@@ -32,7 +32,7 @@ async def rssShowAll(session: CommandSession):
         if not rss_list:
             await session.finish("❌ 当前群组没有任何订阅！")
     elif guild_channel_id:
-        rss_list = rss.find_guild_channel(guild_channel=str(guild_channel_id))
+        rss_list = rss.find_guild_channel(guild_channel=guild_channel_id)
         if not rss_list:
             await session.finish("❌ 当前子频道没有任何订阅！")
     else:

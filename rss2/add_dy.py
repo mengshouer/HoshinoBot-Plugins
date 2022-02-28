@@ -61,10 +61,10 @@ async def add(session: CommandSession):
         rss.name = name
         try:
             url = dy[1]
+            rss.url = url
+            await add_group_or_user(rss, group_id, user_id, guild_channel_id)
         except IndexError:
             await session.finish("❌ 输入的订阅地址为空！")
-        rss.url = url
-        await add_group_or_user(rss, group_id, user_id, guild_channel_id)
 
 
 # add.args_parser 装饰器将函数声明为 add 命令的参数解析器

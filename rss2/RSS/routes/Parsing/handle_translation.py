@@ -12,7 +12,7 @@ try:
 except:
     flag = 0
 
-from google_trans_new import google_translator
+from translate import Translator
 from nonebot.log import logger
 
 from ....config import config
@@ -31,7 +31,7 @@ async def handle_translation(content: str) -> str:
             return dltext + "\n"
     except Exception as e:
         logger.error(e)
-    translator = google_translator()
+    translator = Translator(to_lang="zh", from_lang="autodetect")
     appid = config.baiduid
     secretKey = config.baidukey
     text = emoji.demojize(content)
@@ -76,9 +76,7 @@ async def handle_translation(content: str) -> str:
                         translator.translate(re.escape(text), lang_tgt="zh")
                     )
         else:
-            text = "\n谷歌翻译：\n" + str(
-                translator.translate(re.escape(text), lang_tgt="zh")
-            )
+            text = "\n谷歌翻译：\n" + str(translator.translate(re.escape(text)))
         text = re.sub(r"\\", "", text)
     except Exception as e:
         text = "\n翻译失败！" + str(e) + "\n"
