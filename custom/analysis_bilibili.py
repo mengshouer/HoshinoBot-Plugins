@@ -35,7 +35,12 @@ async def rex_bilibili(bot, ev):
     patterns = r"(\.bilibili\.com)|(^(av|cv)(\d+))|(BV([a-zA-Z0-9]{10})+)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)|(QQ小程序&#93;哔哩哔哩)"
     match = re.compile(patterns, re.I).search(text)
     if match:
-        group_id = ev.group_id if ev.group_id else 1
+        if ev.group_id:
+            group_id = ev.group_id
+        elif ev.channel_id:
+            group_id = ev.channel_id
+        else:
+            group_id = None
         msg = await bili_keyword(group_id, text)
         if msg:
             try:
