@@ -1,5 +1,5 @@
 import httpx
-from nonebot import on_command, CommandSession
+from nonebot import CommandSession
 from hoshino import Service
 
 sv = Service("nbnhhsh")

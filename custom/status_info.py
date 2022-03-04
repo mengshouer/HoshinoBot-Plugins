@@ -1,4 +1,3 @@
-import nonebot
 import psutil
 from nonebot.argparse import ArgumentParser
 from nonebot import on_command, CommandSession
