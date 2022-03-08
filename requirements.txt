@@ -7,7 +7,7 @@ arrow
 bbcode
 emoji
 feedparser
-translate
+deep-translator
 httpx
 ImageHash
 magneturi
@@ -18,3 +18,4 @@ python-qbittorrent
 tenacity
 tinydb~=4.6.1
 typing-extensions
+pydantic[dotenv]

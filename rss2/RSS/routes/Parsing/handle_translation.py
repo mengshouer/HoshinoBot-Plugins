@@ -1,47 +1,36 @@
-import random
-import emoji
-import re
 import hashlib
+import random
+import re
+
+import emoji
 import httpx
-
-try:
-    import deepl
-    from langdetect import detect
-
-    flag = 1
-except:
-    flag = 0
-
-from translate import Translator
-from nonebot.log import logger
+from deep_translator import GoogleTranslator
+from nonebot import logger
 
 from ....config import config
 
 
 # 翻译
 async def handle_translation(content: str) -> str:
-    try:
-        if flag == 1:
-            sl = detect(content)
-            if sl == "zh-cn" or sl == "zh-tw":
-                sl = "zh"
-            dltext = "\nDeepL翻译：\n" + deepl.translate(
-                source_language=sl, target_language="ZH", text=content
-            )
-            return dltext + "\n"
-    except Exception as e:
-        logger.error(e)
-    translator = Translator(to_lang="zh", from_lang="autodetect")
-    appid = config.baiduid
-    secretKey = config.baidukey
+    proxies = (
+        {
+            "https": config.rss_proxy,
+            "http": config.rss_proxy,
+        }
+        if config.rss_proxy
+        else None
+    )
+    translator = GoogleTranslator(source="auto", target="zh-CN", proxies=proxies)
+    appid = config.baidu_id
+    secret_key = config.baidu_key
     text = emoji.demojize(content)
     text = re.sub(r":[A-Za-z_]*:", " ", text)
     try:
-        if appid and secretKey:
-            url = f"https://api.fanyi.baidu.com/api/trans/vip/translate"
+        if appid and secret_key:
+            url = "https://api.fanyi.baidu.com/api/trans/vip/translate"
             salt = str(random.randint(32768, 65536))
             sign = hashlib.md5(
-                (appid + content + salt + secretKey).encode()
+                (appid + content + salt + secret_key).encode()
             ).hexdigest()
             params = {
                 "q": content,
@@ -52,32 +41,18 @@ async def handle_translation(content: str) -> str:
                 "sign": sign,
             }
             async with httpx.AsyncClient(proxies={}) as client:
-                r = await client.get(url, params=params, timeout=10)
+                r = (await client.get(url, params=params, timeout=10)).json()
             try:
-                i = 0
-                str_tl = ""
-                while i < len(r.json()["trans_result"]):
-                    str_tl += r.json()["trans_result"][i]["dst"] + "\n"
-                    i += 1
-                text = "\n百度翻译：\n" + str_tl
-            except Exception as e:
-                if r.json()["error_code"] == "52003":
-                    logger.warning(
-                        "无效的appid，尝试使用谷歌翻译，错误信息：" + str(r.json()["error_msg"])
-                    )
-                    text = "\n谷歌翻译：\n" + str(
-                        translator.translate(re.escape(text), lang_tgt="zh")
-                    )
-                else:
-                    logger.warning(
-                        "使用百度翻译错误：" + str(r.json()["error_msg"]) + "，开始尝试使用谷歌翻译"
-                    )
-                    text = "\n谷歌翻译：\n" + str(
-                        translator.translate(re.escape(text), lang_tgt="zh")
-                    )
+                content = ""
+                for i in r["trans_result"]:
+                    content += i["dst"] + "\n"
+                text = "\n百度翻译：\n" + content[:-1]
+            except Exception:
+                logger.warning(f"使用百度翻译错误：{r['error_msg']}，开始尝试使用谷歌翻译")
+                text = "\n谷歌翻译：\n" + str(translator.translate(re.escape(text)))
         else:
             text = "\n谷歌翻译：\n" + str(translator.translate(re.escape(text)))
-        text = re.sub(r"\\", "", text)
+        text = text.replace("\\", "")
     except Exception as e:
         text = "\n翻译失败！" + str(e) + "\n"
     return text
