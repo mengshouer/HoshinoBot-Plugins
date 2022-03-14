@@ -39,6 +39,7 @@ class ELFConfig(BaseSettings):
     max_length: int = 1024  # 正文长度限制，防止消息太长刷屏，以及消息过长发送失败的情况
 
     version: str = ""
+    guild_superusers = []
 
     def __getattr__(self, name: str) -> Any:
         data = self.dict()

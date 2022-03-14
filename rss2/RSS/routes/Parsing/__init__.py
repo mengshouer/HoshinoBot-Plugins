@@ -339,7 +339,7 @@ async def handle_title(
 
     res = f"标题：{title}\n"
     if rss.translation:
-        res += await handle_translation(content=title)
+        res += (await handle_translation(content=title)) + "\n"
 
     # 如果开启了只推送标题，跳过下面判断标题与正文相似度的处理
     if rss.only_title:

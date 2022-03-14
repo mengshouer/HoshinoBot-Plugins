@@ -20,97 +20,106 @@ async def send_msg(rss: rss_class.Rss, msg: str, item: dict) -> bool:
     bot_qq = list(await get_bot_qq(bot))
     error_msg = f"消息发送失败，已达最大重试次数！\n链接：[{item['link']}]"
     if rss.user_id:
+        all_friend = {}
+        friend_list = []
         for sid in bot_qq:
-            friend_list = await get_bot_friend_list(bot, sid)
-            for user_id in rss.user_id:
-                if int(user_id) not in friend_list:
-                    logger.warning(f"QQ号[{user_id}]不是Bot[{sid}]的好友 链接：[{item['link']}]")
-                    continue
-                try:
-                    await bot.send_msg(
-                        self_id=sid,
-                        message_type="private",
-                        user_id=int(user_id),
-                        message=str(msg),
+            f = await get_bot_friend_list(sid, bot)
+            all_friend[sid] = f
+            friend_list.extend(f)
+        friend_list = set(friend_list)
+        for user_id in rss.user_id:
+            if int(user_id) not in friend_list:
+                logger.error(f"QQ号[{user_id}]不是Bot的好友 链接：[{item['link']}]")
+                continue
+            try:
+                sid = [k for k, v in all_friend.items() if int(user_id) in v][0]
+                await bot.send_msg(
+                    self_id=sid,
+                    message_type="private",
+                    user_id=int(user_id),
+                    message=str(msg),
+                )
+                flag = True
+            except Exception as e:
+                logger.error(f"E: {repr(e)} 链接：[{item['link']}]")
+                if item.get("count") == 3:
+                    await bot.send_private_msg(
+                        user_id=int(user_id), message=f"{error_msg}\nE: {repr(e)}"
                     )
-                    flag = True
-                except Exception as e:
-                    logger.error(f"E: {repr(e)} 链接：[{item['link']}]")
-                    if item.get("count") == 3:
-                        await bot.send_private_msg(
-                            user_id=int(user_id), message=f"{error_msg}\nE: {repr(e)}"
-                        )
 
     if rss.group_id:
+        all_group = {}
+        group_list = []
         for sid in bot_qq:
-            group_list = await get_bot_group_list(bot, sid)
-            for group_id in rss.group_id:
-                if int(group_id) not in group_list:
-                    logger.warning(f"Bot[{sid}]未加入群组[{group_id}] 链接：[{item['link']}]")
-                    continue
-                try:
-                    await bot.send_msg(
-                        self_id=sid,
-                        message_type="group",
-                        group_id=int(group_id),
-                        message=str(msg),
+            g = await get_bot_group_list(sid, bot)
+            all_group[sid] = g
+            group_list.extend(g)
+        group_list = set(group_list)
+        for group_id in rss.group_id:
+            if int(group_id) not in group_list:
+                logger.error(f"Bot未加入群组[{group_id}] 链接：[{item['link']}]")
+                continue
+            try:
+                sid = [k for k, v in all_group.items() if int(group_id) in v][0]
+                await bot.send_msg(
+                    self_id=sid,
+                    message_type="group",
+                    group_id=int(group_id),
+                    message=str(msg),
+                )
+                flag = True
+            except Exception as e:
+                logger.error(f"E: {repr(e)} 链接：[{item['link']}]")
+                if item.get("count") == 3:
+                    await bot.send_group_msg(
+                        group_id=int(group_id), message=f"E: {repr(e)}\n{error_msg}"
                     )
-                    flag = True
-                except Exception as e:
-                    logger.error(f"E: {repr(e)} 链接：[{item['link']}]")
-                    if item.get("count") == 3:
-                        await bot.send_group_msg(
-                            group_id=int(group_id), message=f"E: {repr(e)}\n{error_msg}"
-                        )
 
     if rss.guild_channel_id:
+        all_guild = {}
+        guild_list = []
+        channel_list = []
         for sid in bot_qq:
-            for guild_channel_id in rss.guild_channel_id:
-                id = guild_channel_id.split("@")
-                guild_id = str(id[0])
-                channel_id = str(id[1])
+            g = await get_bot_guild_channel_list(sid, bot)
+            all_guild[sid] = g
+            guild_list.extend(g)
+        guild_list = set(guild_list)
+        for guild_channel_id in rss.guild_channel_id:
+            guild_id, channel_id = guild_channel_id.split("@")
 
-                guild_list = await get_bot_guild_channel_list(sid, bot)
-                if guild_id not in guild_list:
-                    guild_name = (
-                        await bot.get_guild_meta_by_guest(
-                            self_id=sid, guild_id=guild_id
-                        )
-                    )["guild_name"]
-                    logger.error(
-                        f"Bot[{bot.self_id}]未加入频道 {guild_name}[{guild_id}] 链接：[{item['link']}]"
-                    )
-                    continue
+            if guild_id not in guild_list:
+                guild_name = (await bot.get_guild_meta_by_guest(guild_id=guild_id))[
+                    "guild_name"
+                ]
+                logger.error(f"Bot未加入频道 {guild_name}[{guild_id}] 链接：[{item['link']}]")
+                continue
 
-                channel_list = await get_bot_guild_channel_list(
-                    sid, bot, guild_id=guild_id
+            sid = [k for k, v in all_guild.items() if guild_id in v][0]
+            channel_list = await get_bot_guild_channel_list(sid, bot, guild_id=guild_id)
+            if channel_id not in channel_list:
+                guild_name = (await bot.get_guild_meta_by_guest(guild_id=guild_id))[
+                    "guild_name"
+                ]
+                logger.error(
+                    f"Bot未加入频道 {guild_name}[{guild_id}]的子频道[{channel_id}] 链接：[{item['link']}]"
                 )
-                if channel_id not in channel_list:
-                    guild_name = (
-                        await bot.get_guild_meta_by_guest(
-                            self_id=sid, guild_id=guild_id
-                        )
-                    )["guild_name"]
-                    logger.error(
-                        f"Bot[{bot.self_id}]未加入频道[{guild_id}]的子频道[{channel_id}] 链接：[{item['link']}]"
-                    )
-                    continue
+                continue
 
-                try:
+            try:
+                await bot.send_guild_channel_msg(
+                    self_id=sid,
+                    message=str(msg),
+                    guild_id=guild_id,
+                    channel_id=channel_id,
+                )
+                flag = True
+            except Exception as e:
+                logger.error(f"E: {repr(e)} 链接：[{item['link']}]")
+                if item.get("count") == 3:
                     await bot.send_guild_channel_msg(
                         self_id=sid,
-                        message=str(msg),
+                        message=f"E: {repr(e)}\n{error_msg}",
                         guild_id=guild_id,
                         channel_id=channel_id,
                     )
-                    flag = True
-                except Exception as e:
-                    logger.error(f"E: {repr(e)} 链接：[{item['link']}]")
-                    if item.get("count") == 3:
-                        await bot.send_guild_channel_msg(
-                            self_id=sid,
-                            message=f"E: {repr(e)}\n{error_msg}",
-                            guild_id=guild_id,
-                            channel_id=channel_id,
-                        )
     return flag
