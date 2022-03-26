@@ -1,7 +1,7 @@
 from nonebot import on_command, CommandSession
 from .permission import admin_permission
 from .RSS import my_trigger as tr
-from .RSS import rss_class
+from .RSS.rss_class import Rss
 
 prompt = """\
 请输入：
@@ -21,29 +21,16 @@ prompt = """\
 )
 async def add_cookies(session: CommandSession):
     rss_cookies = session.get("add_cookies", prompt=prompt)
+    name, cookies = rss_cookies.split(" ", 1)
 
-    dy = rss_cookies.split(" ", 1)
-
-    rss = rss_class.Rss()
     # 判断是否有该名称订阅
-    try:
-        name = dy[0]
-    except IndexError:
-        await session.finish("❌ 输入的订阅名为空！")
-
-    rss = rss.find_name(name=name)
-
+    rss = Rss.find_name(name=name)
     if rss is None:
         await session.finish(f"❌ 不存在该订阅: {name}")
     else:
-        try:
-            cookies = dy[1]
-        except IndexError:
-            await session.finish("❌ 输入的cookies为空！")
-
         rss.name = name
         if rss.set_cookies(cookies):
-            await tr.add_job(rss)
+            tr.add_job(rss)
             await session.finish(f"👏 {rss.name}的Cookies添加成功！\nCookies:{rss.cookies}\n")
         else:
             await session.finish(f"❌ {rss.name}的Cookies添加失败！\nCookies:{rss.cookies}\n")
@@ -57,7 +44,7 @@ async def _(session: CommandSession):
     if session.is_first_run:
         # 该命令第一次运行（第一次进入命令会话）
         if stripped_arg:
-            session.state["deldy"] = stripped_arg
+            session.state["add_cookies"] = stripped_arg
         return
 
     if not stripped_arg:

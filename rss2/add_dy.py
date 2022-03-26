@@ -1,7 +1,8 @@
-from nonebot import on_command, CommandSession
+from typing import Optional
 
+from nonebot import on_command, CommandSession
 from .RSS import my_trigger as tr
-from .RSS import rss_class
+from .RSS.rss_class import Rss
 from .permission import admin_permission
 
 prompt = """\
@@ -19,7 +20,7 @@ prompt = """\
     permission=admin_permission,
     only_to_me=False,
 )
-async def add(session: CommandSession):
+async def add(session: CommandSession) -> None:
     user_id = session.ctx["user_id"]
     group_id = session.ctx.get("group_id")
     guild_channel_id = session.ctx.get("guild_id")
@@ -31,7 +32,7 @@ async def add(session: CommandSession):
 
     dy = rss_dy_link.split(" ")
 
-    rss = rss_class.Rss()
+    rss = Rss()
     # 判断是否有该名称订阅，有就将当前qq或群加入订阅
     try:
         name = dy[0]
@@ -39,18 +40,23 @@ async def add(session: CommandSession):
         await session.send("❌ 输入的订阅名为空！")
         return
 
-    async def add_group_or_user(_rss, _group_id, _user_id, _guild_channel_id):
+    async def add_group_or_user(
+        _rss: Rss,
+        _group_id: Optional[int],
+        _user_id: Optional[str],
+        _guild_channel_id: Optional[str],
+    ) -> None:
         if _group_id:
             _rss.add_user_or_group(group=str(_group_id))
-            await tr.add_job(_rss)
+            tr.add_job(_rss)
             await session.finish("👏 订阅到当前群组成功！")
         elif _guild_channel_id:
             _rss.add_user_or_group(guild_channel=_guild_channel_id)
-            await tr.add_job(_rss)
+            tr.add_job(_rss)
             await session.finish("👏 订阅到当前子频道成功！")
         else:
             _rss.add_user_or_group(user=_user_id)
-            await tr.add_job(_rss)
+            tr.add_job(_rss)
             await session.finish("👏 订阅到当前账号成功！")
 
     # # 判断是否有该名称订阅，有就将当前qq或群加入订阅

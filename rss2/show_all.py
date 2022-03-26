@@ -2,7 +2,7 @@ import re
 
 from nonebot import on_command, CommandSession
 
-from .RSS import rss_class
+from .RSS.rss_class import Rss
 from .show_dy import handle_rss_list
 from .permission import admin_permission
 
@@ -13,7 +13,7 @@ from .permission import admin_permission
     permission=admin_permission,
     only_to_me=False,
 )
-async def rssShowAll(session: CommandSession):
+async def rssShowAll(session: CommandSession) -> None:
     args = session.current_arg_text
     if args:
         search_keyword = args  # 如果用户发送了参数则直接赋值
@@ -25,24 +25,23 @@ async def rssShowAll(session: CommandSession):
         group_id = None
         guild_channel_id = guild_channel_id + "@" + session.ctx.get("channel_id")
 
-    rss = rss_class.Rss()
-
     if group_id:
-        rss_list = rss.find_group(group=str(group_id))
+        rss_list = Rss.find_group(group=str(group_id))
         if not rss_list:
             await session.finish("❌ 当前群组没有任何订阅！")
     elif guild_channel_id:
-        rss_list = rss.find_guild_channel(guild_channel=guild_channel_id)
+        rss_list = Rss.find_guild_channel(guild_channel=guild_channel_id)
         if not rss_list:
             await session.finish("❌ 当前子频道没有任何订阅！")
     else:
-        rss_list = rss.read_rss()
+        rss_list = Rss.read_rss()
 
     result = []
     if search_keyword:
         for i in rss_list:
-            test = re.search(search_keyword, i.name, flags=re.I) or re.search(
-                search_keyword, i.url, flags=re.I
+            test = bool(
+                re.search(search_keyword, i.name, flags=re.I)
+                or re.search(search_keyword, i.url, flags=re.I)
             )
             if not group_id and not guild_channel_id and search_keyword.isdigit():
                 if i.user_id:

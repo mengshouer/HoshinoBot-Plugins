@@ -1,14 +1,14 @@
 import copy
 import re
+from typing import Any, List, Optional
 
 from nonebot import on_command, CommandSession
 from .permission import admin_permission
 from nonebot.log import logger
 from tinydb import TinyDB, Query
-from typing import List, Union
 
 from .RSS import my_trigger as tr
-from .RSS import rss_class
+from .RSS.rss_class import Rss
 from .config import DATA_PATH, JSON_PATH
 
 prompt = """\
@@ -48,7 +48,7 @@ prompt = """\
 """
 
 # 处理带多个值的订阅参数
-def handle_property(value: str, property_list: list) -> list:
+def handle_property(value: str, property_list: List[Any]) -> List[Any]:
     # 清空
     if value == "-1":
         return []
@@ -87,14 +87,14 @@ attribute_dict = {
 
 # 处理要修改的订阅参数
 async def handle_change_list(
-    rss: rss_class.Rss,
+    rss: Rss,
     key_to_change: str,
     value_to_change: str,
-    group_id: Union[int, None],
-    guild_channel_id: Union[str, None],
-):
+    group_id: Optional[int],
+    guild_channel_id: Optional[str],
+) -> None:
     if key_to_change == "name":
-        await tr.delete_job(rss)
+        tr.delete_job(rss)
         rss.rename_file(str(DATA_PATH / (value_to_change + ".json")))
     elif (
         key_to_change in ["qq", "qun", "channel"]
@@ -134,7 +134,7 @@ async def handle_change_list(
 
 
 # 参数特殊处理：正文待移除内容
-async def handle_rm_list(rss_list: List[rss_class.Rss], change_info: str) -> list:
+async def handle_rm_list(rss_list: List[Rss], change_info: str) -> List[str]:
     rm_list_exist = re.search(" rm_list='.+'", change_info)
     rm_list = None
 
@@ -161,7 +161,7 @@ async def handle_rm_list(rss_list: List[rss_class.Rss], change_info: str) -> lis
 @on_command(
     "change", aliases=("修改订阅", "moddy"), permission=admin_permission, only_to_me=False
 )
-async def change(session: CommandSession):
+async def change(session: CommandSession) -> None:
     change_info = session.get("change", prompt=prompt)
     group_id = session.ctx.get("group_id")
     guild_channel_id = session.ctx.get("guild_id")
@@ -169,9 +169,11 @@ async def change(session: CommandSession):
         group_id = None
         guild_channel_id = guild_channel_id + "@" + session.ctx.get("channel_id")
     name_list = change_info.split(" ")[0].split(",")
-    rss = rss_class.Rss()
-    rss_list = [rss.find_name(name=name) for name in name_list]
-    rss_list = [rss for rss in rss_list if rss]
+    rss_list: List[Rss] = []
+    for name in name_list:
+        rss_tmp = Rss.find_name(name=name)
+        if rss_tmp:
+            rss_list.append(rss_tmp)
 
     if group_id:
         if re.search(" (qq|qun|channel)=", change_info):
@@ -225,9 +227,9 @@ async def change(session: CommandSession):
 
         # 加入定时任务
         if not rss.stop:
-            await tr.add_job(rss)
+            tr.add_job(rss)
         else:
-            await tr.delete_job(rss)
+            tr.delete_job(rss)
             logger.info(f"{rss_name} 已停止更新")
         rss_msg = str(rss)
 

@@ -5,7 +5,7 @@ from nonebot import on_command, CommandSession
 from .permission import admin_permission
 
 from .RSS import my_trigger as tr
-from .RSS import rss_class
+from .RSS.rss_class import Rss
 
 # 存储目录
 FILE_PATH = str(str(Path.cwd()) + os.sep + "data" + os.sep)
@@ -14,7 +14,7 @@ FILE_PATH = str(str(Path.cwd()) + os.sep + "data" + os.sep)
 @on_command(
     "deldy", aliases=("drop", "删除订阅"), permission=admin_permission, only_to_me=False
 )
-async def deldy(session: CommandSession):
+async def deldy(session: CommandSession) -> None:
     rss_name = session.get("deldy", prompt="输入要删除的订阅名")
     group_id = session.ctx.get("group_id")
     guild_channel_id = session.ctx.get("guild_id")
@@ -22,8 +22,7 @@ async def deldy(session: CommandSession):
         group_id = None
         guild_channel_id = guild_channel_id + "@" + session.ctx.get("channel_id")
 
-    rss = rss_class.Rss()
-    rss = rss.find_name(name=rss_name)
+    rss = Rss.find_name(name=rss_name)
 
     if rss is None:
         await session.finish("❌ 删除失败！不存在该订阅！")
@@ -32,9 +31,9 @@ async def deldy(session: CommandSession):
             if rss.delete_group(group=str(group_id)):
                 if not any([rss.group_id, rss.user_id, rss.guild_channel_id]):
                     rss.delete_rss()
-                    await tr.delete_job(rss)
+                    tr.delete_job(rss)
                 else:
-                    await tr.add_job(rss)
+                    tr.add_job(rss)
                 await session.finish(f"👏 当前群组取消订阅 {rss.name} 成功！")
             else:
                 await session.finish(f"❌ 当前群组没有订阅： {rss.name} ！")
@@ -42,15 +41,15 @@ async def deldy(session: CommandSession):
             if rss.delete_guild_channel(guild_channel=guild_channel_id):
                 if not any([rss.group_id, rss.user_id, rss.guild_channel_id]):
                     rss.delete_rss()
-                    await tr.delete_job(rss)
+                    tr.delete_job(rss)
                 else:
-                    await tr.add_job(rss)
+                    tr.add_job(rss)
                 await session.finish(f"👏 当前子频道取消订阅 {rss.name} 成功！")
             else:
                 await session.finish(f"❌ 当前子频道没有订阅： {rss.name} ！")
         else:
             rss.delete_rss()
-            await tr.delete_job(rss)
+            tr.delete_job(rss)
             await session.finish(f"👏 订阅 {rss.name} 删除成功！")
 
 

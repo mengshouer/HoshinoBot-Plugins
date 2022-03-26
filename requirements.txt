@@ -1,4 +1,4 @@
-aiohttp
+httpx
 nonebot
 APScheduler
 psutil
@@ -8,7 +8,7 @@ bbcode
 emoji
 feedparser
 deep-translator
-httpx
+aiohttp
 ImageHash
 magneturi
 Pillow
@@ -19,3 +19,4 @@ tenacity
 tinydb~=4.6.1
 typing-extensions
 pydantic[dotenv]
+yarl

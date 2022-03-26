@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 
 async def get_bot_qq(bot) -> List[int]:
@@ -15,7 +15,9 @@ async def get_bot_group_list(sid, bot) -> List[int]:
     return [i["group_id"] for i in group_list]
 
 
-async def get_bot_guild_channel_list(sid, bot, guild_id: str = None) -> List[str]:
+async def get_bot_guild_channel_list(
+    sid, bot, guild_id: Optional[str] = None
+) -> List[str]:
     guild_list = await bot.get_guild_list(self_id=sid)
     if guild_id is None:
         return [i["guild_id"] for i in guild_list]
