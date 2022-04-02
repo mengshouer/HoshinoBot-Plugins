@@ -3,7 +3,8 @@ import aiohttp
 import time
 import urllib.parse
 import json
-from hoshino import Service
+import nonebot
+from hoshino import Service, logger
 
 sv = Service("analysis_bilibili")
 sv2 = Service("search_bilibili_video")
@@ -18,17 +19,20 @@ async def search_bilibili_video_by_title(bot, ev):
         await bot.send(ev, msg)
     except:
         # 避免简介有风控内容无法发送
-        await bot.send(ev, "此次解析可能被风控，尝试去除简介后发送！")
+        logger.warning(f"{msg}\n此次解析可能被风控，尝试去除简介后发送！")
         msg = re.sub(r"简介.*", "", msg)
         await bot.send(ev, msg)
 
 
 analysis_stat = {}  # analysis_stat: video_url(vurl)
+blacklist = getattr(nonebot.get_bot().config, "analysis_blacklist", [])
 
 # on_rex判断不到小程序信息
 @sv.on_message()
 async def rex_bilibili(bot, ev):
     text = str(ev.message).strip()
+    if blacklist and ev.user_id in blacklist:
+        return
     if re.search(r"(b23.tv)|(bili(22|23|33|2233).cn)", text, re.I):
         # 提前处理短链接，避免解析到其他的
         text = await b23_extract(text)
@@ -47,7 +51,7 @@ async def rex_bilibili(bot, ev):
                 await bot.send(ev, msg)
             except:
                 # 避免简介有风控内容无法发送
-                await bot.send(ev, "此次解析可能被风控，尝试去除简介后发送！")
+                logger.warning(f"{msg}\n此次解析可能被风控，尝试去除简介后发送！")
                 msg = re.sub(r"简介.*", "", msg)
                 await bot.send(ev, msg)
 
@@ -106,8 +110,7 @@ async def b23_extract(text):
     async with aiohttp.request(
         "GET", url, timeout=aiohttp.client.ClientTimeout(10)
     ) as resp:
-        r = str(resp.url)
-    return r
+        return str(resp.url)
 
 
 async def extract(text: str):
@@ -120,9 +123,9 @@ async def extract(text: str):
         ssid = re.compile(r"ss\d+", re.I).search(text)
         mdid = re.compile(r"md\d+", re.I).search(text)
         room_id = re.compile(r"live.bilibili.com/(blanc/|h5/)?(\d+)", re.I).search(text)
-        cvid = re.compile(r"(cv|/read/(mobile|native)(/|\?id=))(\d+)", re.I).search(
-            text
-        )
+        cvid = re.compile(
+            r"(/read/(cv|mobile|native)(/|\?id=)?|^cv)(\d+)", re.I
+        ).search(text)
         dynamic_id_type2 = re.compile(
             r"(t|m).bilibili.com/(\d+)\?(.*?)(&|&amp;)type=2", re.I
         ).search(text)
@@ -159,15 +162,13 @@ async def search_bili_by_title(title: str):
     async with aiohttp.request(
         "GET", search_url, timeout=aiohttp.client.ClientTimeout(10)
     ) as resp:
-        r = await resp.json()
+        result = (await resp.json())["data"]["result"]
 
-    result = r["data"]["result"]
     for i in result:
         if i.get("result_type") != "video":
             continue
         # 只返回第一个结果
-        url = i["data"][0].get("arcurl")
-        return url
+        return i["data"][0].get("arcurl")
 
 
 async def video_detail(url, page):
@@ -175,8 +176,9 @@ async def video_detail(url, page):
         async with aiohttp.request(
             "GET", url, timeout=aiohttp.client.ClientTimeout(10)
         ) as resp:
-            res = await resp.json()
-            res = res["data"]
+            res = (await resp.json()).get("data")
+            if not res:
+                return "解析到视频被删了/稿件不可见或审核中/权限不足", url
         vurl = f"https://www.bilibili.com/video/av{res['aid']}"
         title = f"\n标题：{res['title']}\n"
         if page:
@@ -211,8 +213,9 @@ async def bangumi_detail(url):
         async with aiohttp.request(
             "GET", url, timeout=aiohttp.client.ClientTimeout(10)
         ) as resp:
-            res = await resp.json()
-            res = res["result"]
+            res = (await resp.json()).get("result")
+            if not res:
+                return None, None
         title = f"番剧：{res['title']}\n"
         desc = f"{res['newest_ep']['desc']}\n"
         index_title = ""
@@ -253,9 +256,8 @@ async def live_detail(url):
             "GET", url, timeout=aiohttp.client.ClientTimeout(10)
         ) as resp:
             res = await resp.json()
-        if res["code"] == -400 or res["code"] == 19002000:
-            msg = "直播间不存在"
-            return msg, None
+            if res["code"] != 0:
+                return None, None
         res = res["data"]
         uname = res["anchor_info"]["base_info"]["uname"]
         room_id = res["room_info"]["room_id"]
@@ -298,8 +300,9 @@ async def article_detail(url, cvid):
         async with aiohttp.request(
             "GET", url, timeout=aiohttp.client.ClientTimeout(10)
         ) as resp:
-            res = await resp.json()
-            res = res["data"]
+            res = (await resp.json()).get("data")
+            if not res:
+                return None, None
         vurl = f"https://www.bilibili.com/read/cv{cvid}\n"
         title = f"标题：{res['title']}\n"
         up = f"作者：{res['author_name']} (https://space.bilibili.com/{res['mid']})\n"
@@ -322,8 +325,9 @@ async def dynamic_detail(url):
         async with aiohttp.request(
             "GET", url, timeout=aiohttp.client.ClientTimeout(10)
         ) as resp:
-            res = await resp.json()
-            res = res["data"]["card"]
+            res = (await resp.json())["data"].get("card")
+            if not res:
+                return None, None
         card = json.loads(res["card"])
         dynamic_id = res["desc"]["dynamic_id"]
         vurl = f"https://t.bilibili.com/{dynamic_id}\n"
