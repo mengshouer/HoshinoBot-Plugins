@@ -23,7 +23,7 @@ async def rssShowAll(session: CommandSession) -> None:
     guild_channel_id = session.ctx.get("guild_id")
     if guild_channel_id:
         group_id = None
-        guild_channel_id = guild_channel_id + "@" + session.ctx.get("channel_id")
+        guild_channel_id = f"{guild_channel_id}@{session.ctx.get('channel_id')}"
 
     if group_id:
         rss_list = Rss.find_group(group=str(group_id))
@@ -56,7 +56,7 @@ async def rssShowAll(session: CommandSession) -> None:
         result = rss_list
 
     if result:
-        msg_str = await handle_rss_list(result)
+        msg_str = handle_rss_list(result)
         await session.finish(msg_str)
     else:
         await session.finish("❌ 当前没有任何订阅！")

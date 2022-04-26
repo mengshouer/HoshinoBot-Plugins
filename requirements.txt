@@ -1,5 +1,4 @@
 httpx
-nonebot
 APScheduler
 psutil
 
@@ -16,7 +15,7 @@ pydantic
 pyquery
 python-qbittorrent
 tenacity
-tinydb~=4.6.1
+tinydb
 typing-extensions
 pydantic[dotenv]
 yarl

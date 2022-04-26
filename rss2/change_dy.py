@@ -86,7 +86,7 @@ attribute_dict = {
 
 
 # 处理要修改的订阅参数
-async def handle_change_list(
+def handle_change_list(
     rss: Rss,
     key_to_change: str,
     value_to_change: str,
@@ -95,9 +95,9 @@ async def handle_change_list(
 ) -> None:
     if key_to_change == "name":
         tr.delete_job(rss)
-        rss.rename_file(str(DATA_PATH / (value_to_change + ".json")))
+        rss.rename_file(str(DATA_PATH / f"{value_to_change}.json"))
     elif (
-        key_to_change in ["qq", "qun", "channel"]
+        key_to_change in {"qq", "qun", "channel"}
         and not group_id
         and not guild_channel_id
     ) or key_to_change == "mode":
@@ -110,7 +110,7 @@ async def handle_change_list(
                 value_to_change = "1"
             else:
                 value_to_change = str(int(float(value_to_change)))
-    elif key_to_change in [
+    elif key_to_change in {
         "proxy",
         "tl",
         "ot",
@@ -119,12 +119,12 @@ async def handle_change_list(
         "upgroup",
         "downopen",
         "stop",
-    ]:
+    }:
         value_to_change = bool(int(value_to_change))  # type:ignore
         if key_to_change == "stop" and not value_to_change and rss.error_count > 0:
             rss.error_count = 0
     elif (
-        key_to_change in ["downkey", "wkey", "blackkey", "bkey"]
+        key_to_change in {"downkey", "wkey", "blackkey", "bkey"}
         and len(value_to_change.strip()) == 0
     ):
         value_to_change = None  # type:ignore
@@ -134,7 +134,7 @@ async def handle_change_list(
 
 
 # 参数特殊处理：正文待移除内容
-async def handle_rm_list(rss_list: List[Rss], change_info: str) -> List[str]:
+def handle_rm_list(rss_list: List[Rss], change_info: str) -> List[str]:
     rm_list_exist = re.search(" rm_list='.+'", change_info)
     rm_list = None
 
@@ -144,11 +144,10 @@ async def handle_rm_list(rss_list: List[Rss], change_info: str) -> List[str]:
         change_info = change_info.replace(rm_list_exist[0], "")
 
     if rm_list:
-        if len(rm_list) == 1 and rm_list[0] == "-1":
-            for rss in rss_list:
+        for rss in rss_list:
+            if len(rm_list) == 1 and rm_list[0] == "-1":
                 setattr(rss, "content_to_remove", None)
-        else:
-            for rss in rss_list:
+            else:
                 setattr(rss, "content_to_remove", rm_list)
 
     change_list = change_info.split(" ")
@@ -167,12 +166,11 @@ async def change(session: CommandSession) -> None:
     guild_channel_id = session.ctx.get("guild_id")
     if guild_channel_id:
         group_id = None
-        guild_channel_id = guild_channel_id + "@" + session.ctx.get("channel_id")
+        guild_channel_id = f"{guild_channel_id}@{session.ctx.get('channel_id')}"
     name_list = change_info.split(" ")[0].split(",")
     rss_list: List[Rss] = []
     for name in name_list:
-        rss_tmp = Rss.find_name(name=name)
-        if rss_tmp:
+        if rss_tmp := Rss.find_name(name=name):
             rss_list.append(rss_tmp)
 
     if group_id:
@@ -187,16 +185,29 @@ async def change(session: CommandSession) -> None:
     print(rss_list)
     if not rss_list:
         await session.finish("❌ 请检查是否存在以下问题：\n1.要修改的订阅名不存在对应的记录\n2.当前群组无权操作")
-    else:
-        if len(rss_list) > 1 and " name=" in change_info:
-            await session.finish("❌ 禁止将多个订阅批量改名！会因为名称相同起冲突！")
+    elif len(rss_list) > 1 and " name=" in change_info:
+        await session.finish("❌ 禁止将多个订阅批量改名！会因为名称相同起冲突！")
 
     # 参数特殊处理：正文待移除内容
-    change_list = await handle_rm_list(rss_list, change_info)
+    change_list = handle_rm_list(rss_list, change_info)
 
+    separator = "\n----------------------\n"
+    rss_msg_list = await batch_change_rss(
+        change_list, group_id, guild_channel_id, rss_list
+    )
+    result_msg = f"修改了 {len(rss_msg_list)} 条订阅：{separator}" + separator.join(
+        rss_msg_list
+    )
+    await session.finish(f"👏 修改成功\n{result_msg}")
+
+
+async def batch_change_rss(
+    change_list: List[str],
+    group_id: Optional[int],
+    guild_channel_id: Optional[str],
+    rss_list: List[Rss],
+) -> List[str]:
     rss_msg_list = []
-    result_msg = "----------------------\n"
-
     for rss in rss_list:
         rss_name = rss.name
         for change_dict in change_list:
@@ -209,7 +220,7 @@ async def change(session: CommandSession) -> None:
                     or value_to_change == "or"
                 ):
                     await session.finish(f"❌ 去重模式参数错误！\n{change_dict}")
-                await handle_change_list(
+                handle_change_list(
                     rss, key_to_change, value_to_change, group_id, guild_channel_id
                 )
             else:
@@ -249,12 +260,7 @@ async def change(session: CommandSession) -> None:
             rss_msg = str(rss_tmp)
 
         rss_msg_list.append(rss_msg)
-
-    result_msg = f"修改了 {len(rss_msg_list)} 条订阅：\n{result_msg}" + result_msg.join(
-        rss_msg_list
-    )
-    await session.finish(f"👏 修改成功\n{result_msg}")
-
+    return rss_msg_list
 
 @change.args_parser
 async def _(session: CommandSession):

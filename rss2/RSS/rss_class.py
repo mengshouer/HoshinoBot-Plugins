@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 
 from nonebot.log import logger
 from tinydb import Query, TinyDB
-from tinydb.operations import set
+from tinydb.operations import set as tinydb_set
 from yarl import URL
 
 from ..config import DATA_PATH, JSON_PATH, config
@@ -40,12 +40,11 @@ class Rss:
     def get_url(self, rsshub: str = config.rsshub) -> str:
         if URL(self.url).scheme in ["http", "https"]:
             return self.url
-        else:
-            # 先判断地址是否 / 开头
-            if self.url.startswith("/"):
-                return rsshub + self.url
+        # 先判断地址是否 / 开头
+        if self.url.startswith("/"):
+            return rsshub + self.url
 
-        return rsshub + "/" + self.url
+        return f"{rsshub}/{self.url}"
 
     # 读取记录
     @staticmethod
@@ -70,10 +69,7 @@ class Rss:
         if name == "rss":
             name = "rss_"
         feed_list = Rss.read_rss()
-        for feed in feed_list:
-            if feed.name == name:
-                return feed
-        return None
+        return next((feed for feed in feed_list if feed.name == name), None)
 
     # 添加订阅
     def add_user_or_group(
@@ -105,9 +101,9 @@ class Rss:
 
     # 删除订阅 群组
     def delete_group(self, group: str) -> bool:
-        if not str(group) in self.group_id:
+        if group not in self.group_id:
             return False
-        self.group_id.remove(str(group))
+        self.group_id.remove(group)
         db = TinyDB(
             JSON_PATH,
             encoding="utf-8",
@@ -115,7 +111,7 @@ class Rss:
             indent=4,
             ensure_ascii=False,
         )
-        db.update(set("group_id", self.group_id), Query().name == self.name)  # type: ignore
+        db.update(tinydb_set("group_id", self.group_id), Query().name == self.name)  # type: ignore
         return True
 
     # 删除订阅 子频道
@@ -131,7 +127,7 @@ class Rss:
             ensure_ascii=False,
         )
         db.update(
-            set("guild_channel_id", self.guild_channel_id), Query().name == self.name  # type: ignore
+            tinydb_set("guild_channel_id", self.guild_channel_id), Query().name == self.name  # type: ignore
         )
         return True
 
@@ -149,13 +145,13 @@ class Rss:
 
     # 重命名订阅缓存 json 文件
     def rename_file(self, target: str) -> None:
-        this_file_path = DATA_PATH / (self.name + ".json")
+        this_file_path = DATA_PATH / f"{self.name}.json"
         if Path.exists(this_file_path):
             this_file_path.rename(target)
 
     # 删除订阅缓存 json 文件
     def delete_file(self) -> None:
-        this_file_path = DATA_PATH / (self.name + ".json")
+        this_file_path = DATA_PATH / f"{self.name}.json"
         Path.unlink(this_file_path, missing_ok=True)
 
     @staticmethod
@@ -187,8 +183,7 @@ class Rss:
     @staticmethod
     def find_user(user: str) -> List["Rss"]:
         rss_old = Rss.read_rss()
-        result = [rss for rss in rss_old if user in rss.user_id]
-        return result
+        return [rss for rss in rss_old if user in rss.user_id]
 
     def set_cookies(self, cookies_str: str) -> bool:
         try:
@@ -205,7 +200,7 @@ class Rss:
                 indent=4,
                 ensure_ascii=False,
             )
-            db.update(set("cookies", cookies), Query().name == self.name)  # type: ignore
+            db.update(tinydb_set("cookies", cookies), Query().name == self.name)  # type: ignore
             return True
         except Exception:
             logger.exception(f"{self.name} 的 Cookies 设置时出错！")
@@ -215,9 +210,7 @@ class Rss:
         mode_name = {"link": "链接", "title": "标题", "image": "图片"}
         mode_msg = ""
         if self.duplicate_filter_mode:
-            delimiter = "、"
-            if "or" in self.duplicate_filter_mode:
-                delimiter = " 或 "
+            delimiter = " 或 " if "or" in self.duplicate_filter_mode else "、"
             mode_msg = (
                 "已启用去重模式，"
                 f"{delimiter.join(mode_name[i] for i in self.duplicate_filter_mode if i != 'or')} 相同时去重"

@@ -27,7 +27,7 @@ async def get_qb(session: CommandSession) -> Any:
     try:
         qb.get_default_save_path()
     except Exception:
-        msg = f"❌ 无法连登录到 qbittorrent ，请检查是否勾选“对本地主机上的客户端跳过身份验证”"
+        msg = "❌ 无法连登录到 qbittorrent ，请检查是否勾选“对本地主机上的客户端跳过身份验证”"
         logger.exception(msg)
         await session.send(msg)
         return None
@@ -65,7 +65,7 @@ async def check_down_status(
                     name=tmp["name"],
                 )
             except Exception:
-                continue
+                pass
     else:
         await session.send(
             f"Hash: {hash_str}\n"

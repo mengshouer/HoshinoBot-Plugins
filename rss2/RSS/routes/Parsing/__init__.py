@@ -15,7 +15,6 @@ from ....config import DATA_PATH, config
 from ....RSS.rss_class import Rss
 from .cache_manage import (
     cache_db_manage,
-    cache_filter,
     cache_json_manage,
     duplicate_exists,
     insert_into_cache_db,
@@ -39,28 +38,13 @@ class ParsingItem:
         priority: int = 10,
         block: bool = False,
     ):
-        """
-        - **类型**: ``object``
-        - **说明**: 解析函数
-        """
+        # 解析函数
         self.func: Callable[..., Any] = func
-
-        """
-        - **类型**: ``str``
-        - **说明**: 匹配的订阅地址正则，"(.*)" 是全都匹配
-        """
+        # 匹配的订阅地址正则，"(.*)" 是全都匹配
         self.rex: str = rex
-
-        """
-        - **类型**: ``int``
-        - **说明**: 优先级，数字越小优先级越高。优先级相同时，会抛弃默认处理方式，即抛弃 rex="(.*)" 
-        """
+        # 优先级，数字越小优先级越高。优先级相同时，会抛弃默认处理方式，即抛弃 rex="(.*)"
         self.priority: int = priority
-
-        """
-        - **类型**: ``bool``
-        - **说明**: 是否阻止执行之后的处理，默认不阻止。抛弃默认处理方式，只需要 block==True and priority<10
-        """
+        # 是否阻止执行之后的处理，默认不阻止。抛弃默认处理方式，只需要 block==True and priority<10
         self.block: bool = block
 
 
@@ -147,7 +131,7 @@ def _handler_filter(_handler_list: List[ParsingItem], _url: str) -> List[Parsing
         (h.func.__name__, "(.*)", h.priority) for h in _result if h.rex != "(.*)"
     ]
     _result = [
-        h for h in _result if not ((h.func.__name__, h.rex, h.priority) in _delete)
+        h for h in _result if (h.func.__name__, h.rex, h.priority) not in _delete
     ]
     return _result
 
@@ -177,7 +161,7 @@ class ParsingRss:
         # 前置处理
         rss_title = new_rss["feed"]["title"]
         new_data = new_rss["entries"]
-        _file = DATA_PATH / (rss_name + ".json")
+        _file = DATA_PATH / f"{rss_name}.json"
         db = TinyDB(
             _file,
             storage=CachingMiddleware(JSONStorage),  # type: ignore
@@ -241,7 +225,7 @@ class ParsingRss:
 @ParsingBase.append_before_handler(priority=10)
 async def handle_check_update(rss: Rss, state: Dict[str, Any]):
     db = state.get("tinydb")
-    change_data = await check_update(db, state.get("new_data"))
+    change_data = check_update(db, state.get("new_data"))
     return {"change_data": change_data}
 
 
@@ -299,7 +283,7 @@ async def handle_check_update(rss: Rss, state: Dict[str, Any]):
         conn = sqlite3.connect(str(DATA_PATH / "cache.db"))
         conn.set_trace_callback(logger.debug)
 
-    await cache_db_manage(conn)
+    cache_db_manage(conn)
 
     delete = []
     for index, item in enumerate(change_data):
@@ -349,7 +333,7 @@ async def handle_title(
     if not rss.only_title:
         res += "\n"
     if rss.translation:
-        res += (await handle_translation(content=title)) + "\n"
+        res += await handle_translation(content=title)
 
     # 如果开启了只推送标题，跳过下面判断标题与正文相似度的处理
     if rss.only_title:
@@ -398,13 +382,13 @@ async def handle_summary(
     tmp_state: Dict[str, Any],
 ) -> str:
     try:
-        tmp += await handle_html_tag(html=Pq(get_summary(item)))
+        tmp += handle_html_tag(html=Pq(get_summary(item)))
     except Exception as e:
         logger.warning(f"{rss.name} 没有正文内容！{e}")
     return tmp
 
 
-# 处理正文 移出指定内容
+# 处理正文 移除指定内容
 @ParsingBase.append_handler(parsing_type="summary", priority=11)
 async def handle_summary(
     rss: Rss,
@@ -418,6 +402,10 @@ async def handle_summary(
     if rss.content_to_remove:
         for pattern in rss.content_to_remove:
             tmp = re.sub(pattern, "", tmp)
+        # 去除多余换行
+        while "\n\n\n" in tmp:
+            tmp = tmp.replace("\n\n\n", "\n\n")
+        tmp = tmp.strip()
     return tmp
 
 
@@ -548,7 +536,7 @@ async def handle_message(
     if await send_msg(rss=rss, msg=item_msg, item=item):
 
         if rss.duplicate_filter_mode:
-            await insert_into_cache_db(
+            insert_into_cache_db(
                 conn=state["conn"], item=item, image_hash=item["image_hash"]
             )
 
@@ -583,7 +571,7 @@ async def after_handler(rss: Rss, state: Dict[str, Any]) -> Dict[str, Any]:
         conn.close()
 
     new_data_length = len(state["new_data"])
-    await cache_json_manage(db, new_data_length)
+    cache_json_manage(db, new_data_length)
     db.close()
 
     return {}

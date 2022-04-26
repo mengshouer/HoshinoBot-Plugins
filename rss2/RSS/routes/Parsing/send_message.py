@@ -13,10 +13,13 @@ from ....RSS.rss_class import Rss
 
 # 发送消息
 async def send_msg(rss: Rss, msg: str, item: Dict[str, Any]) -> bool:
-    bot = nonebot.get_bot()
-    flag = False
+    try:
+        bot = nonebot.get_bot()
+    except Exception:
+        return False
     if not msg:
         return False
+    flag = False
     try:
         bot_qq = list(await get_bot_qq(bot))
         error_msg = f"消息发送失败，已达最大重试次数！\n链接：[{item.get('link')}]"
@@ -38,7 +41,7 @@ async def send_msg(rss: Rss, msg: str, item: Dict[str, Any]) -> bool:
                         self_id=sid,
                         message_type="private",
                         user_id=int(user_id),
-                        message=str(msg),
+                        message=msg,
                     )
                     flag = True
                 except Exception as e:
@@ -69,7 +72,7 @@ async def send_msg(rss: Rss, msg: str, item: Dict[str, Any]) -> bool:
                         self_id=sid,
                         message_type="group",
                         group_id=int(group_id),
-                        message=str(msg),
+                        message=msg,
                     )
                     flag = True
                 except Exception as e:
@@ -123,7 +126,7 @@ async def send_msg(rss: Rss, msg: str, item: Dict[str, Any]) -> bool:
                 try:
                     await bot.send_guild_channel_msg(
                         self_id=s,
-                        message=str(msg),
+                        message=msg,
                         guild_id=guild_id,
                         channel_id=channel_id,
                     )

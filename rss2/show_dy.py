@@ -7,12 +7,11 @@ from .permission import admin_permission
 from .RSS.rss_class import Rss
 
 
-async def handle_rss_list(rss_list: List[Rss]) -> str:
+def handle_rss_list(rss_list: List[Rss]) -> str:
     rss_info_list = [f"{i.name}：{i.url}" for i in rss_list]
     rss_info_list.sort()
     msg_str = f"当前共有 {len(rss_info_list)} 条订阅：\n\n" + "\n\n".join(rss_info_list)
-    rss_stopped_info_list = [f"{i.name}：{i.url}" for i in rss_list if i.stop]
-    if rss_stopped_info_list:
+    if rss_stopped_info_list := [f"{i.name}：{i.url}" for i in rss_list if i.stop]:
         rss_stopped_info_list.sort()
         msg_str += (
             "\n----------------------\n"
@@ -36,7 +35,7 @@ async def rssShow(session: CommandSession) -> None:
     guild_channel_id = session.ctx.get("guild_id")
     if guild_channel_id:
         group_id = None
-        guild_channel_id = guild_channel_id + "@" + session.ctx.get("channel_id")
+        guild_channel_id = f"{guild_channel_id}@{session.ctx.get('channel_id')}"
 
     if rss_name:
         rss = Rss.find_name(rss_name)
@@ -46,7 +45,7 @@ async def rssShow(session: CommandSession) -> None:
             rss_msg = str(rss)
             if group_id:
                 # 隐私考虑，不展示除当前群组外的订阅
-                if not str(group_id) in rss.group_id:
+                if str(group_id) not in rss.group_id:
                     await session.finish(f"❌ 当前群组未订阅 {rss_name} ")
                 rss_tmp = copy.deepcopy(rss)
                 rss_tmp.guild_channel_id = ["*"]
@@ -76,7 +75,7 @@ async def rssShow(session: CommandSession) -> None:
         rss_list = Rss.find_user(user=user_id)
 
     if rss_list:
-        msg_str = await handle_rss_list(rss_list)
+        msg_str = handle_rss_list(rss_list)
         await session.finish(msg_str)
     else:
         await session.finish("❌ 当前没有任何订阅！")

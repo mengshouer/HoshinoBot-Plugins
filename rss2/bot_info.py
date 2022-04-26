@@ -21,10 +21,9 @@ async def get_bot_guild_channel_list(
     guild_list = await bot.get_guild_list(self_id=sid)
     if guild_id is None:
         return [i["guild_id"] for i in guild_list]
-    else:
-        if guild_id in [i["guild_id"] for i in guild_list]:
-            channel_list = await bot.get_guild_channel_list(
-                self_id=sid, guild_id=guild_id
-            )
-            return [i["channel_id"] for i in channel_list]
+    if guild_id in [i["guild_id"] for i in guild_list]:
+        channel_list = await bot.get_guild_channel_list(
+            self_id=sid, guild_id=guild_id
+        )
+        return [i["channel_id"] for i in channel_list]
     return []

@@ -20,37 +20,36 @@ async def deldy(session: CommandSession) -> None:
     guild_channel_id = session.ctx.get("guild_id")
     if guild_channel_id:
         group_id = None
-        guild_channel_id = guild_channel_id + "@" + session.ctx.get("channel_id")
+        guild_channel_id = f"{guild_channel_id}@{session.ctx.get('channel_id')}"
 
     rss = Rss.find_name(name=rss_name)
 
     if rss is None:
         await session.finish("❌ 删除失败！不存在该订阅！")
-    else:
-        if group_id:
-            if rss.delete_group(group=str(group_id)):
-                if not any([rss.group_id, rss.user_id, rss.guild_channel_id]):
-                    rss.delete_rss()
-                    tr.delete_job(rss)
-                else:
-                    tr.add_job(rss)
-                await session.finish(f"👏 当前群组取消订阅 {rss.name} 成功！")
+    elif guild_channel_id:
+        if rss.delete_guild_channel(guild_channel=guild_channel_id):
+            if not any([rss.group_id, rss.user_id, rss.guild_channel_id]):
+                rss.delete_rss()
+                tr.delete_job(rss)
             else:
-                await session.finish(f"❌ 当前群组没有订阅： {rss.name} ！")
-        elif guild_channel_id:
-            if rss.delete_guild_channel(guild_channel=guild_channel_id):
-                if not any([rss.group_id, rss.user_id, rss.guild_channel_id]):
-                    rss.delete_rss()
-                    tr.delete_job(rss)
-                else:
-                    tr.add_job(rss)
-                await session.finish(f"👏 当前子频道取消订阅 {rss.name} 成功！")
-            else:
-                await session.finish(f"❌ 当前子频道没有订阅： {rss.name} ！")
+                tr.add_job(rss)
+            await session.finish(f"👏 当前子频道取消订阅 {rss.name} 成功！")
         else:
-            rss.delete_rss()
-            tr.delete_job(rss)
-            await session.finish(f"👏 订阅 {rss.name} 删除成功！")
+            await session.finish(f"❌ 当前子频道没有订阅： {rss.name} ！")
+    elif group_id:
+        if rss.delete_group(group=str(group_id)):
+            if not any([rss.group_id, rss.user_id, rss.guild_channel_id]):
+                rss.delete_rss()
+                tr.delete_job(rss)
+            else:
+                tr.add_job(rss)
+            await session.finish(f"👏 当前群组取消订阅 {rss.name} 成功！")
+        else:
+            await session.finish(f"❌ 当前群组没有订阅： {rss.name} ！")
+    else:
+        rss.delete_rss()
+        tr.delete_job(rss)
+        await session.finish(f"👏 订阅 {rss.name} 删除成功！")
 
 
 @deldy.args_parser
