@@ -46,7 +46,7 @@ async def send_msg(msg: str) -> List[Dict[str, Any]]:
     if config.down_status_msg_group:
         bot_qq = await get_bot_qq(bot)
         for sid in bot_qq:
-            group_list = await get_bot_group_list(bot, sid)
+            group_list = await get_bot_group_list(sid, bot)
             for group_id in config.down_status_msg_group:
                 if int(group_id) not in group_list:
                     logger.error(f"Bot[{sid}]未加入群组[{group_id}]")
