@@ -9,3 +9,4 @@ def admin_permission(sender: SenderRoles):
         or sender.is_owner
         or sender.sent_by(config.guild_superusers)
     )
+
