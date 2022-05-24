@@ -28,6 +28,9 @@ async def add(session: CommandSession) -> None:
     except ValueError:
         await session.finish("❌ 请输入正确的格式！")
 
+    if _ := Rss.get_one_by_name(name):
+        await session.finish(f"已存在订阅名为 {name} 的订阅")
+
     user_id = session.ctx["user_id"]
     group_id = session.ctx.get("group_id")
     guild_channel_id = session.ctx.get("guild_id")
