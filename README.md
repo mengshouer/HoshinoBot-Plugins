@@ -4,4 +4,8 @@
 ### 在当前目录下执行 `pip install -r requirements.txt` 安装依赖库<br>
 ### `pip install -r requirements.txt --upgrade` 更新依赖库<br>
 需配合[Hoshino(v2)](https://github.com/Ice-Cirno/HoshinoBot)使用<br>
-具体使用看[WIKI](https://github.com/mengshouer/HoshinoBot-Plugins/wiki)
+具体使用看[WIKI](https://github.com/mengshouer/HoshinoBot-Plugins/wiki)<br>
+## 其他插件
+[FFXIV相关插件](https://github.com/mengshouer/HoshinoBot-Plugins/tree/ffxiv)
+
+[搜图插件](https://github.com/mengshouer/HoshinoBot-Plugins/tree/picsearch)
