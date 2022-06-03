@@ -1,0 +1,10 @@
+pydantic
+arrow
+datetime
+aiohttp
+lxml
+PicImageSearch
+pyquery
+tinydb
+yarl
+pillow
