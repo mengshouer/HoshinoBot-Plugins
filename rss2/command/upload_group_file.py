@@ -14,12 +14,12 @@ async def upload_group_file(session: CommandSession) -> None:
         target = re.search(
             "(magnet:\?xt=urn:btih:[a-fA-F0-9]{40})|(http.*?\.torrent)",
             str(session.event.message),
-        )[0]
+        )
         if not target:
             await session.send("请输入种子链接")
             return
         await start_down(
-            url=target,
+            url=target[0],
             group_ids=[str(session.event.group_id)],
             name="手动上传",
             proxy=get_proxy(True),
