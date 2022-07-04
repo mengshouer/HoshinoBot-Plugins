@@ -116,7 +116,15 @@ async def get_torrent_info_from_hash(
     info = None
     if re.search(r"magnet:\?xt=urn:btih:", url):
         qb.download_from_link(link=url)
-        hash_str = re.search("[A-Fa-f0-9]{40}", url)[0].lower()  # type: ignore
+        hash_str = re.search("[A-Fa-f0-9]{40}", url)
+        if not hash_str:
+            hash_str = (
+                base64.b16encode(base64.b32decode(re.search("[2-7A-Za-z]{32}", url)[0]))
+                .decode("utf-8")
+                .lower()
+            )
+        else:
+            hash_str = hash_str[0].lower()
     else:
         async with aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=100)
@@ -129,17 +137,6 @@ async def get_torrent_info_from_hash(
             except Exception as e:
                 await send_msg(f"下载种子失败，可能需要代理\n{e}")
                 return {}
-
-    while not info:
-        for tmp_torrent in qb.torrents():
-            if tmp_torrent["hash"] == hash_str and tmp_torrent["size"]:
-                info = {
-                    "hash": tmp_torrent["hash"],
-                    "filename": tmp_torrent["name"],
-                    "size": convert_size(tmp_torrent["size"]),
-                }
-        await asyncio.sleep(1)
-    return info
 
 
 # 种子地址，种子下载路径，群文件上传 群列表，订阅名称
