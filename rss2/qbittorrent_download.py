@@ -2,6 +2,7 @@ import asyncio
 import base64
 import re
 from typing import Any, Dict, List, Optional
+from aiocqhttp import ActionFailed, NetworkError
 
 import aiohttp
 import arrow
@@ -177,8 +178,13 @@ async def check_down_status(hash_str: str, group_ids: List[str], name: str) -> N
     qb = await get_qb_client()
     if not qb:
         return
-    info = qb.get_torrent(hash_str)
-    files = qb.get_torrent_files(hash_str)
+    try:
+        info = qb.get_torrent(hash_str)
+        files = qb.get_torrent_files(hash_str)
+    except Exception as e:
+        logger.exception(e)
+        scheduler.remove_job(hash_str)
+        return
     bot = nonebot.get_bot()
     if info["total_downloaded"] - info["total_size"] >= 0.000000:
         all_time = arrow.now() - down_info[hash_str]["start_time"]
@@ -206,12 +212,14 @@ async def check_down_status(hash_str: str, group_ids: List[str], name: str) -> N
                             file=path,
                             name=tmp["name"],
                         )
-                    except Exception as e:
+                    except ActionFailed:
                         await send_msg(
                             f"{name}\nHash：{hash_str}\n上传到群：{group_id}失败！请手动上传！",
                             [group_id],
                         )
-                        logger.error(e)
+                        logger.exception(e)
+                    except NetworkError as e:
+                        logger.warning(e)
                 except TimeoutError as e:
                     logger.warning(e)
         scheduler.remove_job(hash_str)
