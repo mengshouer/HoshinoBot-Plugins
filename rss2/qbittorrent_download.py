@@ -212,7 +212,7 @@ async def check_down_status(hash_str: str, group_ids: List[str], name: str) -> N
                             file=path,
                             name=tmp["name"],
                         )
-                    except ActionFailed:
+                    except ActionFailed as e:
                         await send_msg(
                             f"{name}\nHash：{hash_str}\n上传到群：{group_id}失败！请手动上传！",
                             [group_id],
