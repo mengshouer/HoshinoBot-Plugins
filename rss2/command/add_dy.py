@@ -31,38 +31,26 @@ async def add(session: CommandSession) -> None:
     if _ := Rss.get_one_by_name(name):
         await session.finish(f"已存在订阅名为 {name} 的订阅")
 
-    user_id = session.ctx["user_id"]
-    group_id = session.ctx.get("group_id")
-    guild_channel_id = session.ctx.get("guild_id")
-    if guild_channel_id:
-        group_id = None
-        guild_channel_id = guild_channel_id + "@" + session.ctx.get("channel_id")
-
-    rss = Rss()
-    rss.name = name
-    rss.url = url
-    await add_feed(session, rss, user_id, group_id, guild_channel_id)
+    await add_feed(name, url, session)
 
 
 async def add_feed(
+    name: str,
+    url: str,
     session: CommandSession,
-    rss: Rss,
-    user_id: Optional[str],
-    group_id: Optional[int],
-    guild_channel_id: Optional[str],
 ) -> None:
-    if guild_channel_id:
-        rss.add_user_or_group(guild_channel=guild_channel_id)
-        await tr.add_job(rss)
-        await session.finish("👏 订阅到当前子频道成功！")
-    elif group_id:
-        rss.add_user_or_group(group=str(group_id))
-        await tr.add_job(rss)
-        await session.finish("👏 订阅到当前群组成功！")
-    else:
-        rss.add_user_or_group(user=user_id)
-        await tr.add_job(rss)
-        await session.finish("👏 订阅到当前账号成功！")
+    rss = Rss()
+    rss.name = name
+    rss.url = url
+    user = session.ctx["user_id"]
+    group = session.ctx.get("group_id")
+    guild_channel = session.ctx.get("guild_id")
+    if guild_channel:
+        group = None
+        guild_channel = guild_channel + "@" + session.ctx.get("channel_id")
+    rss.add_user_or_group_or_channel(user, group, guild_channel)
+    await session.send(f"👏 已成功添加订阅 {name} ！")
+    await tr.add_job(rss)
 
 
 # add.args_parser 装饰器将函数声明为 add 命令的参数解析器

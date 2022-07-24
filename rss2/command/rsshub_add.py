@@ -53,7 +53,7 @@ async def handle_rsshub_routes(session: CommandSession) -> None:
 
     global rsshub_routes
     if not rsshub_routes:
-        async with aiohttp.ClientSession(raise_for_status=True) as s:
+        async with aiohttp.ClientSession() as s:
             resp = await s.get(rsshub_url.with_path("api/routes"), proxy=proxy)
             if resp.status != 200:
                 await session.finish("获取路由数据失败，请检查 RSSHub 的地址配置及网络连接")
@@ -107,14 +107,4 @@ async def handle_route_args(session: CommandSession) -> None:
         if len(i.strip("#")) > 0:
             feed_url += f"/{i}"
 
-    user_id = session.ctx["user_id"]
-    group_id = session.ctx.get("group_id")
-    guild_channel_id = session.ctx.get("guild_id")
-    if guild_channel_id:
-        group_id = None
-        guild_channel_id = f"{guild_channel_id}@{session.ctx.get('channel_id')}"
-
-    rss = Rss()
-    rss.name = name
-    rss.url = feed_url
-    await add_feed(session, rss, user_id, group_id, guild_channel_id)
+    await add_feed(name, feed_url, session)

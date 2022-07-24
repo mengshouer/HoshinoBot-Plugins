@@ -14,7 +14,7 @@ from nonebot.log import logger
 from qbittorrent import Client
 
 from .config import config
-from .utils import convert_size, get_bot_group_list, get_bot_qq
+from .utils import convert_size, get_torrent_b16_hash, get_bot_group_list, get_bot_qq
 
 # 计划
 # 创建一个全局定时器用来检测种子下载情况
@@ -44,25 +44,15 @@ async def send_msg(msg: str, notice_group=[]) -> List[Dict[str, Any]]:
     logger.info(msg)
     bot = nonebot.get_bot()
     msg_id = []
-    down_status_msg_group = config.down_status_msg_group
-    if notice_group:
-        down_status_msg_group = notice_group
-    if down_status_msg_group:
+    if down_status_msg_group := (notice_group or config.down_status_msg_group):
         bot_qq = get_bot_qq(bot)
         for sid in bot_qq:
             group_list = await get_bot_group_list(sid, bot)
             for group_id in down_status_msg_group:
                 if int(group_id) not in group_list:
-                    logger.error(f"Bot[{sid}]未加入群组[{group_id}]")
+                    logger.error(f"Bot[{bot.self_id}]未加入群组[{group_id}]")
                     continue
-                msg_id.append(
-                    await bot.send_msg(
-                        self_id=sid,
-                        message_type="group",
-                        group_id=int(group_id),
-                        message=msg,
-                    )
-                )
+                msg_id.append(await bot.send_group_msg(group_id=group_id, message=msg))
     return msg_id
 
 
@@ -95,38 +85,23 @@ async def get_qb_client() -> Optional[Client]:
     return qb
 
 
-def get_torrent_b16_hash(content: bytes) -> str:
-    import magneturi
-
-    # mangetlink = magneturi.from_torrent_file(torrentname)
-    manget_link = magneturi.from_torrent_data(content)
-    # print(mangetlink)
-    ch = ""
-    n = 20
-    b32_hash = n * ch + manget_link[20:52]
-    # print(b32Hash)
-    b16_hash = base64.b16encode(base64.b32decode(b32_hash))
-    b16_hash = b16_hash.lower()
-    # print("40位info hash值：" + '\n' + b16Hash)
-    # print("磁力链：" + '\n' + "magnet:?xt=urn:btih:" + b16Hash)
-    return str(b16_hash, "utf-8")
-
-
 async def get_torrent_info_from_hash(
     qb: Client, url: str, proxy: Optional[str]
 ) -> Dict[str, str]:
     info = None
     if re.search(r"magnet:\?xt=urn:btih:", url):
         qb.download_from_link(link=url)
-        hash_str = re.search("[A-Fa-f0-9]{40}", url)
-        if not hash_str:
+        if _hash_str := re.search(r"[A-F\d]{40}", url, flags=re.I):
+            hash_str = _hash_str[0].lower()
+        else:
             hash_str = (
-                base64.b16encode(base64.b32decode(re.search("[2-7A-Za-z]{32}", url)[0]))
+                base64.b16encode(
+                    base64.b32decode(re.search(r"[2-7A-Z]{32}", url, flags=re.I)[0])  # type: ignore
+                )
                 .decode("utf-8")
                 .lower()
             )
-        else:
-            hash_str = hash_str[0].lower()
+
     else:
         async with aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=100)
@@ -179,6 +154,7 @@ async def check_down_status(hash_str: str, group_ids: List[str], name: str) -> N
     qb = await get_qb_client()
     if not qb:
         return
+    # 防止中途删掉任务，无限执行
     try:
         info = qb.get_torrent(hash_str)
         files = qb.get_torrent_files(hash_str)
@@ -201,8 +177,7 @@ async def check_down_status(hash_str: str, group_ids: List[str], name: str) -> N
                 try:
                     path = Path(info.get("save_path", "")) / tmp["name"]
                     if config.qb_down_path:
-                        _path = Path(config.qb_down_path)
-                        if _path.is_dir():
+                        if (_path := Path(config.qb_down_path)).is_dir():
                             path = _path / tmp["name"]
                     await send_msg(f"{name}\nHash：{hash_str}\n开始上传到群：{group_id}")
                     try:
@@ -212,12 +187,10 @@ async def check_down_status(hash_str: str, group_ids: List[str], name: str) -> N
                             file=str(path),
                             name=tmp["name"],
                         )
-                    except ActionFailed as e:
-                        await send_msg(
-                            f"{name}\nHash：{hash_str}\n上传到群：{group_id}失败！请手动上传！",
-                            [group_id],
-                        )
-                        logger.exception(e)
+                    except ActionFailed:
+                        msg = f"{name}\nHash：{hash_str}\n上传到群：{group_id}失败！请手动上传！"
+                        await send_msg(msg, [group_id])
+                        logger.exception(msg)
                     except NetworkError as e:
                         logger.warning(e)
                 except TimeoutError as e:

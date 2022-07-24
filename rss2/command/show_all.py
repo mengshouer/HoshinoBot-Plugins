@@ -1,3 +1,4 @@
+import asyncio
 import re
 
 from nonebot import on_command, CommandSession
@@ -56,7 +57,11 @@ async def rssShowAll(session: CommandSession) -> None:
         result = rss_list
 
     if result:
-        msg_str = handle_rss_list(result)
-        await session.finish(msg_str)
+        await session.send(f"当前共有 {len(result)} 条订阅")
+        result.sort(key=lambda x: x.get_url())
+        await asyncio.sleep(0.5)
+        for parted_result in [result[i : i + 30] for i in range(0, len(result), 30)]:
+            msg_str = handle_rss_list(parted_result)
+            await session.send(msg_str)
     else:
         await session.finish("❌ 当前没有任何订阅！")

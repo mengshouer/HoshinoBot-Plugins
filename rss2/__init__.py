@@ -1,7 +1,9 @@
 import asyncio
+import itertools
 
 import nonebot
 from nonebot.log import logger
+from yarl import URL
 
 from . import command
 from . import my_trigger as tr
@@ -20,4 +22,13 @@ async def start(event) -> None:
         logger.info("第一次启动，你还没有订阅，记得添加哟！")
     logger.info("ELF_RSS 订阅器启动成功！")
     # 创建检查更新任务
-    await asyncio.gather(*[tr.add_job(rss) for rss in rss_list if not rss.stop])
+    rss_list_group = zip(
+        *[
+            list(group)
+            for key, group in itertools.groupby(
+                rss_list, lambda x: URL(x.get_url()).host
+            )
+        ]
+    )
+    for _rss_list in rss_list_group:
+        await asyncio.gather(*[tr.add_job(rss) for rss in _rss_list if not rss.stop])

@@ -11,6 +11,7 @@ deep-translator
 aiohttp
 ImageHash
 magneturi
+pikpakapi
 Pillow
 pydantic
 pyquery
