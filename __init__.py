@@ -89,20 +89,35 @@ def get_args(plain_text) -> Tuple[str, bool]:
     return mode, purge
 
 
-def handle_message(ev):
+def handle_message(ev, reply_msg=None):
     ret, mode, purge, file, url, sbtype = 0, "all", False, "", "", ""
-    for m in ev.message:
-        if m.type == "image":
-            file = m.data["file"]
-            url = m.data["url"]
-            if "subType" in m.data:
-                sbtype = m.data["subType"]
+    if not reply_msg:
+        for m in ev.message:
+            if m.type == "image":
+                file = m.data["file"]
+                url = m.data["url"]
+                if "subType" in m.data:
+                    sbtype = m.data["subType"]
+                else:
+                    sbtype = None
+                ret = 1
+                continue
             else:
-                sbtype = None
-            ret = 1
-            continue
+                mode, purge = get_args(str(m))
+    else:
+        ret = re.search(r"\[CQ:image,file=(.*)?,url=(.*)\]", str(reply_msg["message"]))
+        if not ret:
+            return ret, mode, purge, file, url, sbtype
+        file = ret.group(1)
+        url = ret.group(2)
+        if ",subType=" in url:
+            sbtype = url.split("=")[-1]
+            url = url.split(",")[0]
+        elif ",subType=" in file:
+            sbtype = file.split("=")[-1]
+            file = file.split(",")[0]
         else:
-            mode, purge = get_args(str(m))
+            sbtype = None
     return ret, mode, purge, file, url, sbtype
 
 
@@ -190,10 +205,13 @@ class PicListener:
 pls = PicListener()
 
 
-async def handle_image_search(bot, ev, gid):
+async def handle_image_search(bot, ev, gid, reply_msg=None):
     uid = ev.user_id
-    ret, mode, purge, file, url, sbtype = handle_message(ev)
+    ret, mode, purge, file, url, sbtype = handle_message(ev, reply_msg)
     if not ret:
+        if reply_msg:
+            await bot.send(ev, "回复消息内不存在图片")
+            return
         if pls.get_on_off_status(gid):
             if uid == pls.on[gid]:
                 pls.timeout[gid] = datetime.now() + timedelta(seconds=30)
@@ -249,12 +267,15 @@ async def thanks(bot, ev, gid):
 
 @sv.on_message(["group", "private"])
 async def picmessage(bot, ev):
-    atcheck, hasimage = False, False
+    atcheck, hasimage, atreply, reply_id = False, False, False, 0
     for m in ev.message:
         if m.type == "image":
             hasimage = True
         elif m.type == "at" and int(m.data["qq"]) == ev.self_id:
             atcheck = True
+        elif m.type == "reply":
+            atreply = True
+            reply_id = m.data["id"]
     gid = ev.group_id if ev.message_type == "group" else ev.user_id
     if str(ev.message).startswith(("识图", "搜图", "查图", "找图")):
         await handle_image_search(bot, ev, gid)
@@ -262,6 +283,14 @@ async def picmessage(bot, ev):
     elif str(ev.message).startswith("谢谢"):
         await thanks(bot, ev, gid)
         return
+    elif atreply:
+        for cmd in ["识图", "搜图", "查图", "找图"]:
+            if cmd in str(ev.message):
+                reply_msg = await bot.get_msg(
+                    self_id=ev.self_id, message_id=int(reply_id)
+                )
+                await handle_image_search(bot, ev, gid, reply_msg)
+                return
     if not hasimage:
         return
     if (ev.message_type == "private" and config.search_immediately) or atcheck:
