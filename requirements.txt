@@ -3,8 +3,8 @@ arrow
 datetime
 aiohttp
 lxml
-PicImageSearch
+PicImageSearch~=3.3.10
 pyquery
-tinydb
+diskcache
 yarl
 pillow
