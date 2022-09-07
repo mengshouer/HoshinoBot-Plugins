@@ -5,8 +5,8 @@ from time import localtime, strftime
 
 import aiohttp
 import nonebot
-from hoshino import Service, logger, Message
-from nonebot import MessageSegment
+from hoshino import Service, logger
+from nonebot import Message, MessageSegment
 
 sv = Service("analysis_bilibili")
 sv2 = Service("search_bilibili_video")
