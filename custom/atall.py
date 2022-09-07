@@ -1,4 +1,5 @@
-from hoshino import Service, MessageSegment
+from hoshino import Service
+from nonebot import MessageSegment
 
 sv_help = """
 让群员使用bot来@全体成员，前提bot得有管理员(叫人用

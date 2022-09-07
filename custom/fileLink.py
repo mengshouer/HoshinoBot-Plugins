@@ -2,7 +2,8 @@ import re
 import urllib
 
 try:
-    from hoshino import Service, MessageSegment
+    from hoshino import Service
+    from nonebot import MessageSegment
 
     _sv = Service("groupFileLink")
     sv = _sv.on_notice
@@ -18,7 +19,10 @@ async def groupFileLink(session):
     file_name = session.ctx["file"]["name"]
     size = session.ctx["file"]["size"]
     link = re.sub(r"fname=.*", f"fname={urllib.parse.quote(file_name)}", link)
-    if link[-4:].lower() in [".jpg", ".png", ".gif", ".bmp"] and size < 31457280:
+    if (
+        link[-4:].lower() in [".jpg", ".png", ".gif", ".bmp", "jfif", "webp"]
+        and size < 31457280
+    ):
         await session.send(MessageSegment.image(link))
     elif (
         link[-4:].lower()
@@ -33,4 +37,3 @@ async def groupFileLink(session):
         await session.send(MessageSegment.record(link))
     else:
         await session.send(f"文件：{file_name}\n直链：{link}")
-
