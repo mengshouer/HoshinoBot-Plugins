@@ -26,10 +26,11 @@ async def search_bilibili_video_by_title(bot, ev):
         await bot.send(ev, msg)
 
 
-analysis_stat = {}  # analysis_stat: video_url(vurl)
+analysis_stat = {}  # group_id : last_vurl
 config = nonebot.get_bot().config
 blacklist = getattr(config, "analysis_blacklist", [])
 analysis_display_image = getattr(config, "analysis_display_image", False)
+analysis_display_image_list = getattr(config, "analysis_display_image_list", [])
 
 # on_rex判断不到小程序信息
 @sv.on_message()
@@ -66,24 +67,15 @@ async def bili_keyword(group_id, text):
         url, page, time_location = extract(text)
         # 如果是小程序就去搜索标题
         if not url:
-            pattern = re.compile(r'"desc":".*?"')
-            desc = re.findall(pattern, text)
-            i = 0
-            while i < len(desc):
-                title_dict = "{" + desc[i] + "}"
-                title = json.loads(title_dict)
-                i += 1
-                if title["desc"] == "哔哩哔哩":
-                    continue
-                vurl = await search_bili_by_title(title["desc"])
+            if title := re.search(r'"desc":("[^"哔哩]+")', text):
+                vurl = await search_bili_by_title(title[1])
                 if vurl:
                     url, page, time_location = extract(vurl)
-                    break
 
         # 获取视频详细信息
         msg, vurl = "", ""
         if "view?" in url:
-            msg, vurl = await video_detail(url, page=page, time=time_location)
+            msg, vurl = await video_detail(url, page=page, time_location=time_location)
         elif "bangumi" in url:
             msg, vurl = await bangumi_detail(url, time_location)
         elif "xlive" in url:
@@ -94,13 +86,10 @@ async def bili_keyword(group_id, text):
             msg, vurl = await dynamic_detail(url)
 
         # 避免多个机器人解析重复推送
-        last_vurl = ""
         if group_id:
-            if group_id in analysis_stat:
-                last_vurl = analysis_stat[group_id]
+            if group_id in analysis_stat and analysis_stat[group_id] == vurl:
+                return ""
             analysis_stat[group_id] = vurl
-        if last_vurl == vurl:
-            return
     except Exception as e:
         msg = "bili_keyword Error: {}".format(type(e))
     return msg
@@ -120,20 +109,31 @@ async def b23_extract(text):
 def extract(text: str):
     try:
         url = ""
+        # 视频分p
         page = re.compile(r"([?&]|&amp;)p=\d+").search(text)
+        # 视频播放定位时间
         time = re.compile(r"([?&]|&amp;)t=\d+").search(text)
+        # 主站视频 av 号
         aid = re.compile(r"av\d+", re.I).search(text)
+        # 主站视频 bv 号
         bvid = re.compile(r"BV([A-Za-z0-9]{10})+", re.I).search(text)
+        # 番剧视频页
         epid = re.compile(r"ep\d+", re.I).search(text)
+        # 番剧剧集ssid(season_id)
         ssid = re.compile(r"ss\d+", re.I).search(text)
+        # 番剧详细页
         mdid = re.compile(r"md\d+", re.I).search(text)
+        # 直播间
         room_id = re.compile(r"live.bilibili.com/(blanc/|h5/)?(\d+)", re.I).search(text)
+        # 文章
         cvid = re.compile(
             r"(/read/(cv|mobile|native)(/|\?id=)?|^cv)(\d+)", re.I
         ).search(text)
+        # 动态
         dynamic_id_type2 = re.compile(
             r"(t|m).bilibili.com/(\d+)\?(.*?)(&|&amp;)type=2", re.I
         ).search(text)
+        # 动态
         dynamic_id = re.compile(r"(t|m).bilibili.com/(\d+)", re.I).search(text)
         if bvid:
             url = f"https://api.bilibili.com/x/web-interface/view?bvid={bvid[0]}"
@@ -158,7 +158,7 @@ def extract(text: str):
             url = f"https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/get_dynamic_detail?dynamic_id={dynamic_id[2]}"
         return url, page, time
     except Exception:
-        return "", None
+        return "", None, None
 
 
 async def search_bili_by_title(title: str):
@@ -195,11 +195,10 @@ async def video_detail(url, **kwargs):
         title = f"\n标题：{res['title']}\n"
         cover = (
             MessageSegment.image(res["pic"])
-            if analysis_display_image
+            if analysis_display_image or "video" in analysis_display_image_list
             else MessageSegment.text("")
         )
-        page = kwargs.get("page")
-        if page:
+        if page := kwargs.get("page"):
             page = page[0].replace("&amp;", "&")
             p = int(page[3:])
             if p <= len(res["pages"]):
@@ -207,8 +206,7 @@ async def video_detail(url, **kwargs):
                 part = res["pages"][p - 1]["part"]
                 if part != res["title"]:
                     title += f"小标题：{part}\n"
-        time_location = kwargs.get("time_location")
-        if time_location:
+        if time_location := kwargs.get("time_location"):
             time_location = time_location[0].replace("&amp;", "&")[3:]
             if page:
                 vurl += f"&t={time_location}"
@@ -242,7 +240,7 @@ async def bangumi_detail(url, time_location):
                 return None, None
         cover = (
             MessageSegment.image(res["cover"])
-            if analysis_display_image
+            if analysis_display_image or "bangumi" in analysis_display_image_list
             else MessageSegment.text("")
         )
         title = f"番剧：{res['title']}\n"
@@ -290,7 +288,7 @@ async def live_detail(url):
         title = res["room_info"]["title"]
         cover = (
             MessageSegment.image(res["room_info"]["cover"])
-            if analysis_display_image
+            if analysis_display_image or "live" in analysis_display_image_list
             else MessageSegment.text("")
         )
         live_status = res["room_info"]["live_status"]
@@ -337,10 +335,10 @@ async def article_detail(url, cvid):
                 return None, None
         images = (
             [MessageSegment.image(i) for i in res["origin_image_urls"]]
-            if analysis_display_image
+            if analysis_display_image or "article" in analysis_display_image_list
             else []
         )
-        vurl = f"https://www.bilibili.com/read/cv{cvid}\n"
+        vurl = f"https://www.bilibili.com/read/cv{cvid}"
         title = f"标题：{res['title']}\n"
         up = f"作者：{res['author_name']} (https://space.bilibili.com/{res['mid']})\n"
         view = f"阅读数：{handle_num(res['stats']['view'])} "
@@ -350,7 +348,7 @@ async def article_detail(url, cvid):
         like = f"点赞数：{handle_num(res['stats']['like'])} "
         dislike = f"不喜欢数：{handle_num(res['stats']['dislike'])}"
         desc = view + favorite + coin + "\n" + share + like + dislike + "\n"
-        mstext = MessageSegment.text("".join([vurl, title, up, desc]))
+        mstext = MessageSegment.text("".join([title, up, desc, vurl]))
         msg = Message(images)
         msg.append(mstext)
         return msg, vurl
@@ -370,23 +368,25 @@ async def dynamic_detail(url):
         card = json.loads(res["card"])
         dynamic_id = res["desc"]["dynamic_id"]
         vurl = f"https://t.bilibili.com/{dynamic_id}\n"
-        item = card.get("item")
-        if not item:
+        if not (item := card.get("item")):
             return "动态不存在文字内容", vurl
-        content = item.get("description")
-        if not content:
+        if not (content := item.get("description")):
             content = item.get("content")
         content = content.replace("\r", "\n")
         if len(content) > 250:
             content = content[:250] + "......"
-        pics = item.get("pictures_count")
-        images = item.get("pictures") if analysis_display_image else []
+        images = (
+            item.get("pictures", [])
+            if analysis_display_image or "dynamic" in analysis_display_image_list
+            else []
+        )
         if images:
             images = [MessageSegment.image(i.get("img_src")) for i in images]
         else:
-            content += f"\nPS：动态中包含{pics}张图片"
-        origin = card.get("origin")
-        if origin:
+            pics = item.get("pictures_count")
+            if pics:
+                content += f"\nPS：动态中包含{pics}张图片"
+        if origin := card.get("origin"):
             jorigin = json.loads(origin)
             short_link = jorigin.get("short_link")
             if short_link:
