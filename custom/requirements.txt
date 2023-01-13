@@ -1,0 +1,4 @@
+httpx
+aiohttp
+pyzbar # scan_qrcode.py
+psutil # status_info.py
