@@ -1,8 +1,8 @@
-from pathlib import Path
 from typing import Any, Dict, Tuple
 
 import aiohttp
 import feedparser
+from nonebot import get_bot
 from nonebot.log import logger
 from tinydb import TinyDB
 from tinydb.middlewares import CachingMiddleware
@@ -11,11 +11,18 @@ from yarl import URL
 
 from . import my_trigger as tr
 from .config import DATA_PATH, config
-from .parsing import get_proxy, send_msg
+from .parsing import get_proxy
 from .parsing.cache_manage import cache_filter
 from .parsing.check_update import dict_hash
 from .parsing.parsing_rss import ParsingRss
 from .rss_class import Rss
+from .utils import (
+    filter_valid_group_id_list,
+    filter_valid_guild_channel_id_list,
+    filter_valid_user_id_list,
+    get_http_caching_headers,
+    send_message_to_admin,
+)
 
 HEADERS = {
     "Accept": "application/xhtml+xml,application/xml,*/*",
@@ -27,66 +34,84 @@ HEADERS = {
 }
 
 
-# TODO: 改造
-# 入口
+# 抓取 feed，读取缓存，检查更新，对更新进行处理
 async def start(rss: Rss) -> None:
-    # 网络加载 新RSS
-    # 读取 旧RSS 记录
-    # 检查更新
-    # 对更新的 RSS 记录列表进行处理，当发送成功后才写入，成功一条写一条
-
-    new_rss, cached = await get_rss(rss)
+    bot = get_bot()  # type: ignore
+    # 先检查订阅者是否合法
+    if rss.user_id:
+        rss.user_id = await filter_valid_user_id_list(bot, rss.user_id)
+    if rss.group_id:
+        rss.group_id = await filter_valid_group_id_list(bot, rss.group_id)
+    if rss.guild_channel_id:
+        rss.guild_channel_id = await filter_valid_guild_channel_id_list(
+            bot, rss.guild_channel_id
+        )
+    if not any([rss.user_id, rss.group_id, rss.guild_channel_id]):
+        await auto_stop_and_notify_admin(rss, bot)
+        return
+    new_rss, cached = await fetch_rss(rss)
+    # 检查是否存在rss记录
+    _file = DATA_PATH / f"{Rss.handle_name(rss.name)}.json"
+    first_time_fetch = not _file.exists()
     if cached:
         logger.info(f"{rss.name} 没有新信息")
         return
     if not new_rss or not new_rss.get("feed"):
         rss.error_count += 1
         logger.warning(f"{rss.name} 抓取失败！")
+        if first_time_fetch:
+            # 第一次抓取失败，如果配置了代理，则自动使用代理抓取
+            if config.rss_proxy and not rss.img_proxy:
+                rss.img_proxy = True
+                logger.info(f"{rss.name} 第一次抓取失败，自动使用代理抓取")
+                await start(rss)
+            else:
+                await auto_stop_and_notify_admin(rss, bot)
         if rss.error_count >= 100:
-            await auto_stop_and_notify_all(rss)
+            await auto_stop_and_notify_admin(rss, bot)
         return
     if new_rss.get("feed") and rss.error_count > 0:
         rss.error_count = 0
-    # 检查是否存在rss记录
-    _file = DATA_PATH / f"{Rss.handle_name(rss.name)}.json"
-    if not Path.exists(_file):
-        db = TinyDB(
+    if first_time_fetch:
+        with TinyDB(
             _file,
             storage=CachingMiddleware(JSONStorage),  # type: ignore
             encoding="utf-8",
             sort_keys=True,
             indent=4,
             ensure_ascii=False,
-        )
-        entries = new_rss["entries"]
-        result = []
-        for i in entries:
-            i["hash"] = dict_hash(i)
-            result.append(cache_filter(i))
-        db.insert_multiple(result)
-        db.close()
+        ) as db:
+            entries = new_rss["entries"]
+            result = []
+            for i in entries:
+                i["hash"] = dict_hash(i)
+                result.append(cache_filter(i))
+            db.insert_multiple(result)
         logger.info(f"{rss.name} 第一次抓取成功！")
         return
 
-    # TODO: 改造
     pr = ParsingRss(rss=rss)
     await pr.start(rss_name=rss.name, new_rss=new_rss)
 
 
-async def auto_stop_and_notify_all(rss: Rss) -> None:
+async def auto_stop_and_notify_admin(rss: Rss, bot) -> None:
     rss.stop = True
     rss.upsert()
     tr.delete_job(rss)
     cookies_str = "及 cookies " if rss.cookies else ""
-    await send_msg(
-        rss=rss,
-        msg=f"{rss.name}[{rss.get_url()}]已经连续抓取失败超过 100 次！已自动停止更新！请检查订阅地址{cookies_str}！",
-        item={},
-    )
+    if not any([rss.user_id, rss.group_id, rss.guild_channel_id]):
+        msg = f"{rss.name}[{rss.get_url()}]无人订阅！已自动停止更新！"
+    elif rss.error_count >= 100:
+        msg = (
+            f"{rss.name}[{rss.get_url()}]已经连续抓取失败超过 100 次！已自动停止更新！请检查订阅地址{cookies_str}！"
+        )
+    else:
+        msg = f"{rss.name}[{rss.get_url()}]第一次抓取失败！已自动停止更新！请检查订阅地址{cookies_str}！"
+    await send_message_to_admin(msg, bot)
 
 
 # 获取 RSS 并解析为 json
-async def get_rss(rss: Rss) -> Tuple[Dict[str, Any], bool]:
+async def fetch_rss(rss: Rss) -> Tuple[Dict[str, Any], bool]:
     rss_url = rss.get_url()
     # 对本机部署的 RSSHub 不使用代理
     local_host = [
@@ -115,15 +140,10 @@ async def get_rss(rss: Rss) -> Tuple[Dict[str, Any], bool]:
         try:
             resp = await session.get(rss_url, proxy=proxy)
             if not config.rsshub_backup:
-                rss.etag = resp.headers.get("ETag")
-                rss.last_modified = resp.headers.get(
-                    "Last-Modified"
-                ) or resp.headers.get("Date")
-                if (
-                    headers.get("If-None-Match") != rss.etag
-                    or headers.get("If-Modified-Since") != rss.last_modified
-                ):
-                    rss.upsert()
+                http_caching_headers = get_http_caching_headers(resp.headers)
+                rss.etag = http_caching_headers["ETag"]
+                rss.last_modified = http_caching_headers["Last-Modified"]
+                rss.upsert()
             if (
                 resp.status == 200 and int(resp.headers.get("Content-Length", "1")) == 0
             ) or resp.status == 304:

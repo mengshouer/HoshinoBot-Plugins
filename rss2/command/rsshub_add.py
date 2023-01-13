@@ -107,4 +107,4 @@ async def handle_route_args(session: CommandSession) -> None:
         if len(i.strip("#")) > 0:
             feed_url += f"/{i}"
 
-    await add_feed(name, feed_url, session)
+    await add_feed(name, feed_url.lstrip("/"), session)

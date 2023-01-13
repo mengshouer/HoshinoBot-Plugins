@@ -29,11 +29,9 @@ async def add_cookies(session: CommandSession):
         await session.finish(f"❌ 不存在该订阅: {name}")
     else:
         rss.name = name
-        if rss.set_cookies(cookies):
-            await tr.add_job(rss)
-            await session.finish(f"👏 {rss.name}的Cookies添加成功！")
-        else:
-            await session.finish(f"❌ {rss.name}的Cookies添加失败！\nCookies:{rss.cookies}")
+        rss.set_cookies(cookies)
+        await tr.add_job(rss)
+        await session.finish(f"👏 {rss.name}的Cookies添加成功！")
 
 
 @add_cookies.args_parser

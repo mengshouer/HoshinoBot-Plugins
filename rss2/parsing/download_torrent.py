@@ -2,6 +2,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 import aiohttp
+from nonebot import get_bot
 from nonebot.log import logger
 
 from ..config import config

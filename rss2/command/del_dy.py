@@ -16,34 +16,55 @@ async def deldy(session: CommandSession) -> None:
         group_id = None
         guild_channel_id = f"{guild_channel_id}@{session.ctx.get('channel_id')}"
 
-    rss = Rss.get_one_by_name(name=rss_name)
+    rss_name_list = rss_name.strip().split(" ")
+    delete_successes = []
+    delete_failures = []
+    for rss_name in rss_name_list:
+        rss = Rss.get_one_by_name(name=rss_name)
+        if rss is None:
+            delete_failures.append(rss_name)
+        elif guild_channel_id:
+            if rss.delete_guild_channel(guild_channel=guild_channel_id):
+                if not any([rss.group_id, rss.user_id, rss.guild_channel_id]):
+                    rss.delete_rss()
+                    tr.delete_job(rss)
+                else:
+                    await tr.add_job(rss)
+                delete_successes.append(rss_name)
+            else:
+                delete_failures.append(rss_name)
+        elif group_id:
+            if rss.delete_group(group=str(group_id)):
+                if not any([rss.group_id, rss.user_id, rss.guild_channel_id]):
+                    rss.delete_rss()
+                    tr.delete_job(rss)
+                else:
+                    await tr.add_job(rss)
+                delete_successes.append(rss_name)
+            else:
+                delete_failures.append(rss_name)
+        else:
+            rss.delete_rss()
+            tr.delete_job(rss)
+            delete_successes.append(rss_name)
 
-    if rss is None:
-        await session.finish("❌ 删除失败！不存在该订阅！")
-    elif guild_channel_id:
-        if rss.delete_guild_channel(guild_channel=guild_channel_id):
-            if not any([rss.group_id, rss.user_id, rss.guild_channel_id]):
-                rss.delete_rss()
-                tr.delete_job(rss)
-            else:
-                await tr.add_job(rss)
-            await session.finish(f"👏 当前子频道取消订阅 {rss.name} 成功！")
+    result = []
+    if delete_successes:
+        if guild_channel_id:
+            result.append(f'👏 当前子频道成功取消订阅： {"、".join(delete_successes)} ！')
+        elif group_id:
+            result.append(f'👏 当前群组成功取消订阅： {"、".join(delete_successes)} ！')
         else:
-            await session.finish(f"❌ 当前子频道没有订阅： {rss.name} ！")
-    elif group_id:
-        if rss.delete_group(group=str(group_id)):
-            if not any([rss.group_id, rss.user_id, rss.guild_channel_id]):
-                rss.delete_rss()
-                tr.delete_job(rss)
-            else:
-                await tr.add_job(rss)
-            await session.finish(f"👏 当前群组取消订阅 {rss.name} 成功！")
+            result.append(f'👏 成功删除订阅： {"、".join(delete_successes)} ！')
+    if delete_failures:
+        if guild_channel_id:
+            result.append(f'❌ 当前子频道没有订阅： {"、".join(delete_successes)} ！')
+        elif group_id:
+            result.append(f'❌ 当前群组没有订阅： {"、".join(delete_successes)} ！')
         else:
-            await session.finish(f"❌ 当前群组没有订阅： {rss.name} ！")
-    else:
-        rss.delete_rss()
-        tr.delete_job(rss)
-        await session.finish(f"👏 订阅 {rss.name} 删除成功！")
+            result.append(f'❌ 未找到订阅： {"、".join(delete_successes)} ！')
+
+    await session.finish("\n".join(result))
 
 
 @deldy.args_parser

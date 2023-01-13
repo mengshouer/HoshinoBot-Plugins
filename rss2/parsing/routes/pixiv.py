@@ -21,7 +21,7 @@ from ..utils import get_summary
 
 
 # 如果启用了去重模式，对推送列表进行过滤
-@ParsingBase.append_before_handler(priority=12, rex="pixiv")
+@ParsingBase.append_before_handler(priority=12, rex="/pixiv/")
 async def handle_check_update(rss: Rss, state: Dict[str, Any]) -> Dict[str, Any]:
     change_data = state["change_data"]
     conn = state["conn"]
@@ -88,23 +88,20 @@ async def handle_picture(
     res = ""
     try:
         res += await handle_img(
-            item=item,
-            img_proxy=rss.img_proxy,
-            img_num=rss.max_image_number,
+            item=item, img_proxy=rss.img_proxy, img_num=rss.max_image_number, rss=rss
         )
     except Exception as e:
         logger.warning(f"{rss.name} 没有正文内容！{e}")
 
     # 判断是否开启了只推送图片
-    if rss.only_pic:
-        return f"{res}\n"
-
-    return f"{tmp + res}\n"
+    return f"{res}\n" if rss.only_pic else f"{tmp + res}\n"
 
 
 # 处理图片、视频
-@retry(stop=(stop_after_attempt(5) | stop_after_delay(30)))  # type: ignore
-async def handle_img(item: Dict[str, Any], img_proxy: bool, img_num: int) -> str:
+@retry(stop=(stop_after_attempt(5) | stop_after_delay(30)))
+async def handle_img(
+    item: Dict[str, Any], img_proxy: bool, img_num: int, rss: Rss
+) -> str:
     if item.get("image_content"):
         return await handle_img_combo_with_content(
             item.get("gif_url", ""), item["image_content"]
@@ -132,13 +129,13 @@ async def handle_img(item: Dict[str, Any], img_proxy: bool, img_num: int) -> str
             doc_img = doc_img[:img_num]
         for img in doc_img:
             url = img.attr("src")
-            img_str += await handle_img_combo(url, img_proxy)
+            img_str += await handle_img_combo(url, img_proxy, rss)
 
     return img_str
 
 
 # 获取动图为视频
-@retry(stop=(stop_after_attempt(5) | stop_after_delay(30)))  # type: ignore
+@retry(stop=(stop_after_attempt(5) | stop_after_delay(30)))
 async def get_ugoira_video(ugoira_id: str) -> Any:
     async with aiohttp.ClientSession() as session:
         data = {"id": ugoira_id, "type": "ugoira"}
@@ -166,7 +163,7 @@ async def handle_source(
 
 
 # 检查更新
-@ParsingBase.append_before_handler(rex="pixiv/ranking", priority=10)
+@ParsingBase.append_before_handler(rex="pixiv/ranking", priority=10)  # type: ignore
 async def handle_check_update(rss: Rss, state: Dict[str, Any]) -> Dict[str, Any]:
     db = state["tinydb"]
     change_data = check_update(db, state["new_data"])

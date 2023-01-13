@@ -6,15 +6,19 @@ from pathlib import Path
 
 import aiohttp
 import arrow
-import nonebot
 from apscheduler.triggers.interval import IntervalTrigger
 from aiocqhttp import ActionFailed, NetworkError
-from nonebot import scheduler
+from nonebot import get_bot, scheduler
 from nonebot.log import logger
 from qbittorrent import Client
 
 from .config import config
-from .utils import convert_size, get_torrent_b16_hash, get_bot_group_list, get_bot_qq
+from .utils import (
+    convert_size,
+    get_torrent_b16_hash,
+    get_bot_group_list,
+    send_message_to_admin,
+)
 
 # 计划
 # 创建一个全局定时器用来检测种子下载情况
@@ -40,19 +44,24 @@ down_info: Dict[str, Dict[str, Any]] = {}
 
 
 # 发送通知
-async def send_msg(msg: str, notice_group=[]) -> List[Dict[str, Any]]:
+async def send_msg(
+    msg: str, notice_group: Optional[List[str]] = None
+) -> List[Dict[str, Any]]:
     logger.info(msg)
-    bot = nonebot.get_bot()
+    bot = get_bot()
     msg_id = []
+    group_list, all_groups = await get_bot_group_list(bot)
     if down_status_msg_group := (notice_group or config.down_status_msg_group):
-        bot_qq = get_bot_qq(bot)
-        for sid in bot_qq:
-            group_list = await get_bot_group_list(sid, bot)
-            for group_id in down_status_msg_group:
-                if int(group_id) not in group_list:
-                    logger.error(f"Bot[{bot.self_id}]未加入群组[{group_id}]")
-                    continue
-                msg_id.append(await bot.send_group_msg(group_id=group_id, message=msg))
+        for group_id in down_status_msg_group:
+            if int(group_id) not in group_list:
+                logger.error(f"Bot[{bot.self_id}]未加入群组[{group_id}]")
+                continue
+            sid = [k for k, v in all_groups.items() if int(group_id) in v][0]
+            msg_id.append(
+                await bot.send_group_msg(
+                    self_id=sid, group_id=int(group_id), message=msg
+                )
+            )
     return msg_id
 
 
@@ -64,7 +73,7 @@ async def get_qb_client() -> Optional[Client]:
         else:
             qb.login()
     except Exception:
-        bot = nonebot.get_bot()
+        bot = get_bot()
         msg = (
             "❌ 无法连接到 qbittorrent ，请检查：\n"
             "1. 是否启动程序\n"
@@ -72,15 +81,15 @@ async def get_qb_client() -> Optional[Client]:
             "3. 连接地址、端口是否正确"
         )
         logger.exception(msg)
-        await bot.send_private_msg(user_id=str(list(config.superusers)[0]), message=msg)
+        await send_message_to_admin(msg, bot)
         return None
     try:
         qb.get_default_save_path()
     except Exception:
-        bot = nonebot.get_bot()
+        bot = get_bot()
         msg = "❌ 无法连登录到 qbittorrent ，请检查相关配置是否正确"
         logger.exception(msg)
-        await bot.send_private_msg(user_id=str(list(config.superusers)[0]), message=msg)
+        await send_message_to_admin(msg, bot)
         return None
     return qb
 
@@ -162,7 +171,9 @@ async def check_down_status(hash_str: str, group_ids: List[str], name: str) -> N
         logger.exception(e)
         scheduler.remove_job(hash_str)
         return
-    bot = nonebot.get_bot()
+    bot = get_bot()
+    all_groups = (await get_bot_group_list(bot))[1]
+    sid = None
     if info["total_downloaded"] - info["total_size"] >= 0.000000:
         all_time = arrow.now() - down_info[hash_str]["start_time"]
         await send_msg(
@@ -180,8 +191,10 @@ async def check_down_status(hash_str: str, group_ids: List[str], name: str) -> N
                         if (_path := Path(config.qb_down_path)).is_dir():
                             path = _path / tmp["name"]
                     await send_msg(f"{name}\nHash：{hash_str}\n开始上传到群：{group_id}")
+                    sid = [k for k, v in all_groups.items() if int(group_id) in v][0]
                     try:
                         await bot.call_action(
+                            self_id=sid,
                             action="upload_group_file",
                             group_id=group_id,
                             file=str(path),
@@ -198,7 +211,7 @@ async def check_down_status(hash_str: str, group_ids: List[str], name: str) -> N
         scheduler.remove_job(hash_str)
         down_info[hash_str]["status"] = DOWN_STATUS_UPLOAD_OK
     else:
-        await delete_msg(down_info[hash_str]["downing_tips_msg_id"])
+        await delete_msg(bot, sid, down_info[hash_str]["downing_tips_msg_id"])
         msg_id = await send_msg(
             f"{name}\n"
             f"Hash：{hash_str}\n"
@@ -209,11 +222,12 @@ async def check_down_status(hash_str: str, group_ids: List[str], name: str) -> N
 
 
 # 撤回消息
-async def delete_msg(msg_ids: List[Dict[str, Any]]) -> None:
-    bot = nonebot.get_bot()
+async def delete_msg(bot, sid, msg_ids: List[Dict[str, Any]]) -> None:
     for msg_id in msg_ids:
         try:
-            await bot.call_action("delete_msg", message_id=msg_id["message_id"])
+            await bot.call_action(
+                "delete_msg", message_id=msg_id["message_id"], self_id=sid
+            )
         except Exception as e:
             logger.warning("下载进度消息撤回失败！", e)
 

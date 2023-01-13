@@ -42,14 +42,11 @@ async def handle_picture(
         logger.warning(f"[{item['link']}]的预览图获取失败")
 
     # 判断是否开启了只推送图片
-    if rss.only_pic:
-        return f"{res}\n"
-
-    return f"{tmp + res}\n"
+    return f"{res}\n" if rss.only_pic else f"{tmp + res}\n"
 
 
 # 处理图片、视频
-@retry(stop=(stop_after_attempt(5) | stop_after_delay(30)))  # type: ignore
+@retry(stop=(stop_after_attempt(5) | stop_after_delay(30)))
 async def handle_img(item: Dict[str, Any], img_proxy: bool) -> str:
     if item.get("image_content"):
         return await handle_img_combo_with_content(
@@ -123,7 +120,7 @@ async def handle_check_update(rss: Rss, state: Dict[str, Any]) -> Dict[str, Any]
 
 
 # 获取正文
-@retry(stop=(stop_after_attempt(5) | stop_after_delay(30)))  # type: ignore
+@retry(stop=(stop_after_attempt(5) | stop_after_delay(30)))
 async def get_summary(item: Dict[str, Any], img_proxy: bool) -> str:
     summary = (
         item["content"][0].get("value") if item.get("content") else item["summary"]

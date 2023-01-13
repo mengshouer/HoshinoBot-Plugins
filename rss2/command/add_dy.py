@@ -1,5 +1,3 @@
-from typing import Optional
-
 from nonebot import on_command, CommandSession
 from .. import my_trigger as tr
 from ..rss_class import Rss
@@ -28,22 +26,31 @@ async def add(session: CommandSession) -> None:
     except ValueError:
         await session.finish("❌ 请输入正确的格式！")
 
-    if _ := Rss.get_one_by_name(name):
-        await session.finish(f"已存在订阅名为 {name} 的订阅")
+    if rss := Rss.get_one_by_name(name):
+        if rss.url != url:
+            await session.finish(f"已存在订阅名为 {name} 的订阅")
+        else:
+            await add_feed(name, url, session, rss)
+        return
 
     await add_feed(name, url, session)
 
 
 async def add_feed(
-    name: str,
-    url: str,
-    session: CommandSession,
+    name: str, url: str, session: CommandSession, rss: Rss = Rss()
 ) -> None:
-    rss = Rss()
     rss.name = name
     rss.url = url
-    user = session.ctx["user_id"]
-    group = session.ctx.get("group_id")
+    user = (
+        str(session.ctx["user_id"])
+        if session.ctx["message_type"] == "private"
+        else None
+    )
+    group = (
+        str(session.ctx.get("group_id"))
+        if session.ctx["message_type"] == "group"
+        else None
+    )
     guild_channel = session.ctx.get("guild_id")
     if guild_channel:
         group = None

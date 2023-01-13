@@ -1,13 +1,16 @@
 import re
-from typing import Any, List, Optional
+from contextlib import suppress
+from copy import deepcopy
+from typing import Any, List, Match, Optional
 
 from nonebot import on_command, CommandSession
 from nonebot.log import logger
 
 from .. import my_trigger as tr
 from ..config import DATA_PATH
-from ..rss_class import Rss
 from ..permission import admin_permission
+from ..rss_class import Rss
+from ..utils import regex_validate
 
 prompt = """\
 请输入要修改的订阅
@@ -25,6 +28,7 @@ prompt = """\
     仅Title(ot)
     仅图片(-op)
     仅含图片(-ohp)
+    下载图片(-downpic): 下载图片到本地硬盘,仅pixiv有效
     下载种子(-downopen)
     白名单关键词(-wkey)
     黑名单关键词(-bkey)
@@ -44,6 +48,7 @@ prompt = """\
     6. 正文待移除内容格式必须如：rm_list='a' 或 rm_list='a','b'。该处理过程在解析 html 标签后进行，设为空使用 rm_list='-1'"
     7. QQ、群号、去重模式前加英文逗号表示追加，-1设为空
     8. 各个属性使用空格分割
+    9. downpic保存的文件位于程序根目录下 "data/image/订阅名/图片名"
 详细用法请查阅文档。\
 """
 
@@ -61,6 +66,25 @@ def handle_property(value: str, property_list: List[Any]) -> List[Any]:
     return list(dict.fromkeys(value_list))
 
 
+# 处理类型为正则表达式的订阅参数
+def handle_regex_property(value: str, old_value: str) -> Optional[str]:
+    result = None
+    if not value:
+        result = None
+    elif value.startswith("+"):
+        result = f"{old_value}|{value.lstrip('+')}" if old_value else value.lstrip("+")
+    elif value.startswith("-"):
+        if regex_list := old_value.split("|"):
+            with suppress(ValueError):
+                regex_list.remove(value.lstrip("-"))
+            result = "|".join(regex_list) if regex_list else None
+    else:
+        result = value
+    if isinstance(result, str) and not regex_validate(result):
+        result = None
+    return result
+
+
 attribute_dict = {
     "name": "name",
     "url": "url",
@@ -73,6 +97,7 @@ attribute_dict = {
     "ot": "only_title",
     "op": "only_pic",
     "ohp": "only_has_pic",
+    "downpic": "download_pic",
     "upgroup": "is_open_upload_group",
     "downopen": "down_torrent",
     "downkey": "down_torrent_keyword",
@@ -118,6 +143,7 @@ def handle_change_list(
         "ot",
         "op",
         "ohp",
+        "downpic",
         "upgroup",
         "downopen",
         "stop",
@@ -126,38 +152,15 @@ def handle_change_list(
         value_to_change = bool(int(value_to_change))  # type:ignore
         if key_to_change == "stop" and not value_to_change and rss.error_count > 0:
             rss.error_count = 0
-    elif (
-        key_to_change in {"downkey", "wkey", "blackkey", "bkey"}
-        and len(value_to_change.strip()) == 0
-    ):
+    elif key_to_change in {"downkey", "wkey", "blackkey", "bkey"}:
+        value_to_change = handle_regex_property(
+            value_to_change, getattr(rss, attribute_dict[key_to_change])
+        )  # type:ignore
+    elif key_to_change == "ppk" and not value_to_change:
         value_to_change = None  # type:ignore
     elif key_to_change == "img_num":
         value_to_change = int(value_to_change)  # type:ignore
     setattr(rss, attribute_dict.get(key_to_change), value_to_change)  # type:ignore
-
-
-# 参数特殊处理：正文待移除内容
-def handle_rm_list(rss_list: List[Rss], change_info: str) -> List[str]:
-    rm_list_exist = re.search(" rm_list='.+'", change_info)
-    rm_list = None
-
-    if rm_list_exist:
-        rm_list_str = rm_list_exist[0].lstrip().replace("rm_list=", "")
-        rm_list = [i.strip("'") for i in rm_list_str.split("','")]
-        change_info = change_info.replace(rm_list_exist[0], "")
-
-    if rm_list:
-        for rss in rss_list:
-            if len(rm_list) == 1 and rm_list[0] == "-1":
-                setattr(rss, "content_to_remove", None)
-            else:
-                setattr(rss, "content_to_remove", rm_list)
-
-    change_list = change_info.split(" ")
-    # 去掉订阅名
-    change_list.pop(0)
-
-    return change_list
 
 
 @on_command(
@@ -205,16 +208,21 @@ async def change(session: CommandSession) -> None:
         await session.finish("❌ 禁止将多个订阅批量改名！会因为名称相同起冲突！")
 
     # 参数特殊处理：正文待移除内容
-    change_list = handle_rm_list(rss_list, change_info)
+    rm_list_exist = re.search("rm_list='.+'", change_info)
+    change_list = handle_rm_list(rss_list, change_info, rm_list_exist)
 
-    separator = "\n----------------------\n"
-    rss_msg_list = await batch_change_rss(
-        session, change_list, group_id, guild_channel_id, rss_list
+    changed_rss_list = await batch_change_rss(
+        session, change_list, group_id, guild_channel_id, rss_list, rm_list_exist
     )
-    result_msg = (
-        f"修改了 {len(rss_msg_list)} 条订阅：{separator}{separator.join(rss_msg_list)}"
-    )
-    await session.finish(f"👏 修改成功\n{result_msg}")
+    # 隐私考虑，不展示除当前群组或频道外的群组、频道和QQ
+    rss_msg_list = [
+        str(rss.hide_some_infos(group_id, guild_channel_id)) for rss in changed_rss_list
+    ]
+    result_msg = f"👏 修改了 {len(rss_msg_list)} 条订阅"
+    if rss_msg_list:
+        separator = "\n----------------------\n"
+        result_msg += separator + separator.join(rss_msg_list)
+    await session.finish(result_msg)
 
 
 async def batch_change_rss(
@@ -223,9 +231,11 @@ async def batch_change_rss(
     group_id: Optional[int],
     guild_channel_id: Optional[str],
     rss_list: List[Rss],
+    rm_list_exist: Optional[Match[str]] = None,
 ) -> List[str]:
-    rss_msg_list = []
+    changed_rss_list = []
     for rss in rss_list:
+        new_rss = deepcopy(rss)
         rss_name = rss.name
         for change_dict in change_list:
             key_to_change, value_to_change = change_dict.split("=", 1)
@@ -237,26 +247,35 @@ async def batch_change_rss(
                     or value_to_change == "or"
                 ):
                     await session.finish(f"❌ 去重模式参数错误！\n{change_dict}")
+                elif key_to_change in {
+                    "downkey",
+                    "wkey",
+                    "blackkey",
+                    "bkey",
+                } and not regex_validate(value_to_change.lstrip("+-")):
+                    await session.finish(f"❌ 正则表达式错误！\n{change_dict}")
+                elif key_to_change == "ppk" and not regex_validate(value_to_change):
+                    await session.finish(f"❌ 正则表达式错误！\n{change_dict}")
                 handle_change_list(
-                    rss, key_to_change, value_to_change, group_id, guild_channel_id
+                    new_rss, key_to_change, value_to_change, group_id, guild_channel_id
                 )
             else:
                 await session.finish(f"❌ 参数错误！\n{change_dict}")
 
+        if new_rss.__dict__ == rss.__dict__ and not rm_list_exist:
+            continue
+        changed_rss_list.append(new_rss)
         # 参数解析完毕，写入
-        rss.upsert(rss_name)
+        new_rss.upsert(rss_name)
 
         # 加入定时任务
-        if not rss.stop:
-            await tr.add_job(rss)
-        else:
-            tr.delete_job(rss)
+        if not new_rss.stop:
+            await tr.add_job(new_rss)
+        elif not rss.stop:
+            tr.delete_job(new_rss)
             logger.info(f"{rss_name} 已停止更新")
 
-        # 隐私考虑，不展示除当前群组或频道外的群组、频道和QQ
-        rss_msg = str(rss.hide_some_infos(group_id, guild_channel_id))
-        rss_msg_list.append(rss_msg)
-    return rss_msg_list
+    return changed_rss_list
 
 
 @change.args_parser
@@ -277,3 +296,28 @@ async def _(session: CommandSession):
 
     # 如果当前正在向用户询问更多信息，且用户输入有效，则放入会话状态
     session.state[session.current_key] = stripped_arg
+
+
+# 参数特殊处理：正文待移除内容
+def handle_rm_list(
+    rss_list: List[Rss], change_info: str, rm_list_exist: Optional[Match[str]] = None
+) -> List[str]:
+    rm_list = None
+
+    if rm_list_exist:
+        rm_list_str = rm_list_exist[0].lstrip().replace("rm_list=", "")
+        rm_list = [i.strip("'") for i in rm_list_str.split("','")]
+        change_info = change_info.replace(rm_list_exist[0], "")
+
+    if rm_list:
+        for rss in rss_list:
+            if len(rm_list) == 1 and rm_list[0] == "-1":
+                setattr(rss, "content_to_remove", None)
+            elif valid_rm_list := [i for i in rm_list if regex_validate(i)]:
+                setattr(rss, "content_to_remove", valid_rm_list)
+
+    change_list = [i.strip() for i in change_info.split(" ")]
+    # 去掉订阅名
+    change_list.pop(0)
+
+    return change_list

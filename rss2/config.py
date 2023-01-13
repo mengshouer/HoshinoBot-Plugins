@@ -23,12 +23,18 @@ class ELFConfig(BaseSettings):
 
     zip_size: int = 2 * 1024
     gif_zip_size: int = 6 * 1024
+    img_format: Optional[str] = None
+    img_down_path: Optional[str] = None
 
     blockquote: bool = True
     black_word: Optional[List[str]] = None
 
     baidu_id: Optional[str] = None
     baidu_key: Optional[str] = None
+    deepl_translator_api_key: Optional[str] = None
+    single_detection_api_key: Optional[
+        str
+    ] = None  # 配合 deepl_translator 使用的语言检测接口，前往https://detectlanguage.com/documentation注册获取api_key
 
     qb_username: Optional[str] = None  # qbittorrent 用户名
     qb_password: Optional[str] = None  # qbittorrent 密码
@@ -44,6 +50,7 @@ class ELFConfig(BaseSettings):
     )
 
     version: str = ""
+    superusers: List[str] = []
     guild_superusers: Optional[List[str]] = None
 
     def __getattr__(self, name: str) -> Any:
