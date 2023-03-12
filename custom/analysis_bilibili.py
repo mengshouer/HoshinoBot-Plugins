@@ -160,22 +160,16 @@ def extract(text: str):
 
 
 async def search_bili_by_title(title: str):
-    mainsite_url = "https://www.bilibili.com"
-    search_url = f"https://api.bilibili.com/x/web-interface/wbi/search/all/v2?keyword={urllib.parse.quote(title)}"
+    search_url = f"https://api.bilibili.com/x/web-interface/wbi/search/type?search_type=video&keyword={urllib.parse.quote(title)}"
 
     async with aiohttp.ClientSession() as session:
-        # set headers
-        async with session.get(mainsite_url) as resp:
-            assert resp.status == 200
-
         async with session.get(search_url) as resp:
-            result = (await resp.json())["data"]["result"]
+            result = await resp.json()
 
-    for i in result:
-        if i.get("result_type") != "video":
-            continue
-        # 只返回第一个结果
-        return i["data"][0].get("arcurl")
+    try:
+        return result["data"]["result"][0]["arcurl"]
+    except TypeError:
+        raise Exception(f"analysis_bilibili error: {result}")
 
 
 # 处理超过一万的数字
