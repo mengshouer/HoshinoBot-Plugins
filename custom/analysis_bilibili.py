@@ -1,22 +1,36 @@
 import re
 import urllib.parse
 import json
-from time import localtime, strftime
-
-import aiohttp
 import nonebot
+from typing import Optional, Union
+from time import localtime, strftime
+from aiohttp import ClientSession
+
 from hoshino import Service, logger
 from nonebot import Message, MessageSegment
 
-sv = Service("analysis_bilibili")
+
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36 Edg/112.0.1722.58"
+}
+analysis_stat = {}  # group_id : last_vurl
+config = nonebot.get_bot().config
+blacklist = getattr(config, "analysis_blacklist", [])
+analysis_display_image = getattr(config, "analysis_display_image", False)
+analysis_display_image_list = getattr(config, "analysis_display_image_list", [])
+trust_env = getattr(config, "analysis_trust_env", False)
+
+
 sv2 = Service("search_bilibili_video")
-
-
+# 手动搜视频标题
 @sv2.on_prefix("搜视频")
 async def search_bilibili_video_by_title(bot, ev):
     title = ev.message.extract_plain_text()
-    vurl = await search_bili_by_title(title)
-    msg = await bili_keyword(ev.group_id, vurl)
+    group_id = ev.group_id if ev.group_id else ev.get("channel_id", None)
+
+    async with ClientSession(trust_env=trust_env, headers=headers) as session:
+        vurl = await search_bili_by_title(title, session)
+        msg = await bili_keyword(group_id, vurl, session)
     try:
         await bot.send(ev, msg)
     except:
@@ -26,12 +40,7 @@ async def search_bilibili_video_by_title(bot, ev):
         await bot.send(ev, msg)
 
 
-analysis_stat = {}  # group_id : last_vurl
-config = nonebot.get_bot().config
-blacklist = getattr(config, "analysis_blacklist", [])
-analysis_display_image = getattr(config, "analysis_display_image", False)
-analysis_display_image_list = getattr(config, "analysis_display_image_list", [])
-
+sv = Service("analysis_bilibili")
 # on_rex判断不到小程序信息
 @sv.on_message()
 async def rex_bilibili(bot, ev):
@@ -44,13 +53,9 @@ async def rex_bilibili(bot, ev):
     patterns = r"(\.bilibili\.com)|(^(av|cv)(\d+))|(^BV([a-zA-Z0-9]{10})+)|(\[\[QQ小程序\]哔哩哔哩\])|(QQ小程序&amp;#93;哔哩哔哩)|(QQ小程序&#93;哔哩哔哩)"
     match = re.compile(patterns, re.I).search(text)
     if match:
-        if ev.group_id:
-            group_id = ev.group_id
-        elif ev.channel_id:
-            group_id = ev.channel_id
-        else:
-            group_id = None
-        msg = await bili_keyword(group_id, text)
+        group_id = ev.group_id if ev.group_id else ev.get("channel_id", None)
+        async with ClientSession(trust_env=trust_env, headers=headers) as session:
+            msg = await bili_keyword(group_id, text, session)
         if msg:
             try:
                 await bot.send(ev, msg)
@@ -61,29 +66,33 @@ async def rex_bilibili(bot, ev):
                 await bot.send(ev, msg)
 
 
-async def bili_keyword(group_id, text):
+async def bili_keyword(
+    group_id: Optional[int], text: str, session: ClientSession
+) -> Union[Message, str]:
     try:
         # 提取url
         url, page, time_location = extract(text)
         # 如果是小程序就去搜索标题
         if not url:
             if title := re.search(r'"desc":("[^"哔哩]+")', text):
-                vurl = await search_bili_by_title(title[1])
+                vurl = await search_bili_by_title(title[1], session)
                 if vurl:
                     url, page, time_location = extract(vurl)
 
         # 获取视频详细信息
         msg, vurl = "", ""
         if "view?" in url:
-            msg, vurl = await video_detail(url, page=page, time_location=time_location)
+            msg, vurl = await video_detail(
+                url, page=page, time_location=time_location, session=session
+            )
         elif "bangumi" in url:
-            msg, vurl = await bangumi_detail(url, time_location)
+            msg, vurl = await bangumi_detail(url, time_location, session)
         elif "xlive" in url:
-            msg, vurl = await live_detail(url)
+            msg, vurl = await live_detail(url, session)
         elif "article" in url:
-            msg, vurl = await article_detail(url, page)
+            msg, vurl = await article_detail(url, page, session)
         elif "dynamic" in url:
-            msg, vurl = await dynamic_detail(url)
+            msg, vurl = await dynamic_detail(url, session)
 
         # 避免多个机器人解析重复推送
         if group_id:
@@ -100,8 +109,10 @@ async def b23_extract(text):
         text.replace("\\", "")
     )
     url = f"https://{b23[0]}"
-    async with aiohttp.request("GET", url) as resp:
-        return str(resp.url)
+    # 考虑到是在 on_message 内进行操作，避免无用的创建 session，所以分开写
+    async with ClientSession(trust_env=trust_env) as session:
+        async with session.get(url) as resp:
+            return str(resp.url)
 
 
 def extract(text: str):
@@ -159,17 +170,22 @@ def extract(text: str):
         return "", None, None
 
 
-async def search_bili_by_title(title: str):
-    search_url = f"https://api.bilibili.com/x/web-interface/wbi/search/type?search_type=video&keyword={urllib.parse.quote(title)}"
+async def search_bili_by_title(title: str, session: ClientSession) -> str:
+    mainsite_url = "https://www.bilibili.com"
+    search_url = f"https://api.bilibili.com/x/web-interface/wbi/search/all/v2?keyword={urllib.parse.quote(title)}"
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get(search_url) as resp:
-            result = await resp.json()
+    # set headers
+    async with session.get(mainsite_url) as resp:
+        assert resp.status == 200
 
-    try:
-        return result["data"]["result"][0]["arcurl"]
-    except TypeError:
-        raise Exception(f"analysis_bilibili error: {result}")
+    async with session.get(search_url) as resp:
+        result = (await resp.json())["data"]["result"]
+
+    for i in result:
+        if i.get("result_type") != "video":
+            continue
+        # 只返回第一个结果
+        return i["data"][0].get("arcurl")
 
 
 # 处理超过一万的数字
@@ -179,9 +195,9 @@ def handle_num(num: int):
     return num
 
 
-async def video_detail(url, **kwargs):
+async def video_detail(url: str, session: ClientSession, **kwargs):
     try:
-        async with aiohttp.request("GET", url) as resp:
+        async with session.get(url) as resp:
             res = (await resp.json()).get("data")
             if not res:
                 return "解析到视频被删了/稿件不可见或审核中/权限不足", url
@@ -224,9 +240,9 @@ async def video_detail(url, **kwargs):
         return msg, None
 
 
-async def bangumi_detail(url, time_location):
+async def bangumi_detail(url: str, time_location: str, session: ClientSession):
     try:
-        async with aiohttp.request("GET", url) as resp:
+        async with session.get(url) as resp:
             res = (await resp.json()).get("result")
             if not res:
                 return None, None
@@ -266,9 +282,9 @@ async def bangumi_detail(url, time_location):
         return msg, None
 
 
-async def live_detail(url):
+async def live_detail(url: str, session: ClientSession):
     try:
-        async with aiohttp.request("GET", url) as resp:
+        async with session.get(url) as resp:
             res = await resp.json()
             if res["code"] != 0:
                 return None, None
@@ -315,9 +331,9 @@ async def live_detail(url):
         return msg, None
 
 
-async def article_detail(url, cvid):
+async def article_detail(url: str, cvid: str, session: ClientSession):
     try:
-        async with aiohttp.request("GET", url) as resp:
+        async with session.get(url) as resp:
             res = (await resp.json()).get("data")
             if not res:
                 return None, None
@@ -345,9 +361,9 @@ async def article_detail(url, cvid):
         return msg, None
 
 
-async def dynamic_detail(url):
+async def dynamic_detail(url: str, session: ClientSession):
     try:
-        async with aiohttp.request("GET", url) as resp:
+        async with session.get(url) as resp:
             res = (await resp.json())["data"].get("card")
             if not res:
                 return None, None
