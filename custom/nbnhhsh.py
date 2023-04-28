@@ -1,6 +1,6 @@
-import httpx
+import aiohttp
 from nonebot import CommandSession
-from hoshino import Service
+from hoshino import Service, util
 
 sv = Service("nbnhhsh")
 
@@ -19,18 +19,18 @@ async def nbnhhsh(session: CommandSession):
         try:
             url = f"https://lab.magiconch.com/api/nbnhhsh/guess"
             data = {"text": episode}
-            with httpx.Client(proxies={}) as client:
-                r = client.post(url, data=data, timeout=5)
-            try:
-                data = r.json()[0]["trans"]
-            except:
-                await session.send(
-                    "未查询到转义，可前往https://lab.magiconch.com/nbnhhsh/ 查询/贡献词条",
-                    at_sender=True,
-                )
-                return
-            msg = "可能拼音缩写的是：" + str(data)
-            await session.send(msg, at_sender=True)
+            async with aiohttp.request("POST", url, json=data) as r:
+                try:
+                    data = (await r.json())[0]["trans"]
+                except:
+                    await session.send(
+                        "未查询到转义，可前往https://lab.magiconch.com/nbnhhsh/ 查询/贡献词条",
+                        at_sender=True,
+                    )
+                    return
+                msg = "可能拼音缩写的是：" + str(data)
+                msg += "\n如果带有屏蔽词自行前往 web:https://lab.magiconch.com/nbnhhsh/ 查询"
+                await session.send(util.filt_message(msg), at_sender=True)
         except Exception as e:
             msg = "Error: {}".format(type(e))
             await session.send(msg)
